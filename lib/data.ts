@@ -7,6 +7,17 @@ export type Row = Record<string,string>;
 let cache: { rows: Row[]; loadedAt: number } | null = null;
 const CACHE_MS = 5 * 60 * 1000;
 
+type TaxonomyRow = { category: string; deeniActivities: string; fields: string };
+
+function loadTaxonomy(): TaxonomyRow[] {
+  try {
+    const file = path.join(process.cwd(), "public/data/fields-category.json");
+    return JSON.parse(fs.readFileSync(file, "utf8")) as TaxonomyRow[];
+  } catch {
+    return [];
+  }
+}
+
 const norm = (v: unknown) => String(v ?? "").trim();
 const lower = (v: unknown) => norm(v).toLowerCase();
 
@@ -131,21 +142,42 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
 }
 
 export function meta(rows: Row[], params: Record<string,string>) {
-  const filtered=rows.filter(r=>
-    eq(r.Category,params.category)&&eq(r.DeeniActivities,params.deeni)&&eq(r.Fields,params.field)&&
-    eq(r.Region,params.region)&&eq(r.State,params.state)&&eq(r.Division,params.division)&&eq(r.District,params.district)
+  const dataFiltered = rows.filter(r=>
+    eq(r.Category,params.category) &&
+    eq(r.DeeniActivities,params.deeni) &&
+    eq(r.Fields,params.field) &&
+    eq(r.Region,params.region) &&
+    eq(r.State,params.state) &&
+    eq(r.Division,params.division) &&
+    eq(r.District,params.district)
   );
-  const uniq=(key:string)=>Array.from(new Set(filtered.map(r=>r[key]).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+
+  const uniq=(key:string)=>Array.from(new Set(dataFiltered.map(r=>r[key]).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+
+  // The uploaded Fields With Category file is the master hierarchy.
+  // Use it for Category → Deeni Activities → Fields so options are available
+  // even when a particular item has no report row in the selected month.
+  const taxonomy=loadTaxonomy();
+  const taxBySelection=taxonomy.filter(t=>
+    (!params.category || lower(t.category)===lower(params.category)) &&
+    (!params.deeni || lower(t.deeniActivities)===lower(params.deeni)) &&
+    (!params.field || lower(t.fields)===lower(params.field))
+  );
+
+  const taxCategories=Array.from(new Set(taxonomy.map(t=>t.category).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const taxDeeni=Array.from(new Set(taxBySelection.map(t=>t.deeniActivities).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const taxFields=Array.from(new Set(taxBySelection.map(t=>t.fields).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+
   return {
-    categories:uniq("Category"),
-    deeniActivities:uniq("DeeniActivities"),
-    fields:uniq("Fields"),
-    regions:uniq("Region"),
-    states:uniq("State"),
-    divisions:uniq("Division"),
-    districts:uniq("District"),
-    chains:uniq("Chain"),
-    departments:uniq("Department"),
+    categories: taxCategories.length ? taxCategories : uniq("Category"),
+    deeniActivities: taxDeeni.length ? taxDeeni : uniq("DeeniActivities"),
+    fields: taxFields.length ? taxFields : uniq("Fields"),
+    regions: uniq("Region"),
+    states: uniq("State"),
+    divisions: uniq("Division"),
+    districts: uniq("District"),
+    chains: uniq("Chain"),
+    departments: uniq("Department"),
     months:Array.from(new Set(rows.map(r=>r.Month).filter(Boolean))).sort()
   };
 }

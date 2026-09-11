@@ -1,0 +1,227 @@
+[
+  {
+    "category": "Basic",
+    "deeniActivities": "Tanzimi Malumat",
+    "fields": "Total Active Muballigh"
+  },
+  {
+    "category": "Basic",
+    "deeniActivities": "Tanzimi Malumat",
+    "fields": "Total Moallimin"
+  },
+  {
+    "category": "Basic",
+    "deeniActivities": "Tanzimi Malumat",
+    "fields": "Total Masjid"
+  },
+  {
+    "category": "Basic",
+    "deeniActivities": "Tanzimi Malumat",
+    "fields": "Apni Masjid"
+  },
+  {
+    "category": "Basic",
+    "deeniActivities": "Tanzimi Malumat",
+    "fields": "Total Zeili Halqe"
+  },
+  {
+    "category": "Basic",
+    "deeniActivities": "Tanzimi Malumat",
+    "fields": "Total Zaili Halqe Taqarrur"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Fajr Ke Liye Jagaen",
+    "fields": "Fajr Ke Liye Jagaen"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Tafseer Sunna/Sunnana",
+    "fields": "Tafseer Sunna/Sunnana"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Dars",
+    "fields": "Masjid Dars"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Dars",
+    "fields": "Area Dars"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Dars",
+    "fields": "Ghar Dars"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Dars",
+    "fields": "Total Dars"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Madrasatul Madina Baligan",
+    "fields": "Madrasatul Madina Baligan Tadad (Masjid)"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Madrasatul Madina Baligan",
+    "fields": "Madrasatul Madina Baligan Shurqa (Masjid)"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Madrasatul Madina Baligan",
+    "fields": "Madrasatul Madina Baligan Tadad (Others)"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Madrasatul Madina Baligan",
+    "fields": "Madrasatul Madina Baligan Shurqa (Others)"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Madrasatul Madina Baligan",
+    "fields": "Total Madrasarul Madina Baligan Tadad"
+  },
+  {
+    "category": "Daily",
+    "deeniActivities": "Madrasatul Madina Baligan",
+    "fields": "Total Madrasarul Madina Baligan Shurqa"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Haftwar Ijtima",
+    "fields": "Haftwar Ijtima Tadad"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Haftwar Ijtima",
+    "fields": "Haftwar Ijtima Shurqa"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Haftwar Ijtima",
+    "fields": "Raat Guzarne Walo Ki Tadad"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Haftwar Ijtima",
+    "fields": "Ijtima me Shurqa ki tadad 120 se zyada hai"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Madani Muzakirah",
+    "fields": "Madani Muzakirah Maqaamat"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Madani Muzakirah",
+    "fields": "Madani Muzakirah Shurqa"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Ek Din Raahe Khuda Me",
+    "fields": "Ek Din Raahe Khuda Me Tadad"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Ek Din Raahe Khuda Me",
+    "fields": "Ek Din Raahe Khuda Me Shurqa"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Madani Halqa",
+    "fields": "Madani Halqa Tadad"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Madani Halqa",
+    "fields": "Madani Halqa Shurqa"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Haftawar Risala",
+    "fields": "Haftwar Risala Padhne Wale / Sunne Wale"
+  },
+  {
+    "category": "Weekly",
+    "deeniActivities": "Alaqai Dora",
+    "fields": "Alaqai Dora Kitni Baar"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Qafila",
+    "fields": "3 Din Qafila Tadad"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Qafila",
+    "fields": "3 Din Qafila Shurqa"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Qafila",
+    "fields": "12 Din Qafila Tadad"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Qafila",
+    "fields": "12 Din Qafila Shurqa"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Qafila",
+    "fields": "1 Maah Qafila Tadad"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Qafila",
+    "fields": "1 Maah Qafila Shurqa"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Qafila",
+    "fields": "12 Maah Qafila Tadad"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Qafila",
+    "fields": "12 Maah Qafila Shurqa"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Courses",
+    "fields": "Short Courses (Gair Riyaeshi) Tadad"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Courses",
+    "fields": "Short Courses (Gair Riyaeshi) Shurqa"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Courses",
+    "fields": "Long Courses (Riyaeshi) Tadad"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Courses",
+    "fields": "Long Courses (Riyaeshi) Shurqa"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Courses",
+    "fields": "Total Courses Tadad"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Courses",
+    "fields": "Total Courses Shurqa"
+  },
+  {
+    "category": "Monthly",
+    "deeniActivities": "Neak Aamal",
+    "fields": "Neak Aamal Risala Wasool"
+  }
+]

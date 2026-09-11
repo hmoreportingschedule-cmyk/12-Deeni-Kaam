@@ -45,7 +45,8 @@ export default function Dashboard({onLogout,username}:{onLogout:()=>void;usernam
    {error&&<div className="card" style={{padding:14,color:"#b91c1c",background:"#fff5f5",marginBottom:14}}>{error}</div>}
    <div className="card filters">
     <div className="section-head" style={{padding:"0 0 14px",border:0}}><div className="section-title">Report Filters & Date</div><div className="date-row"><CalendarDays size={17} color="#0f766e"/><input className="month" type="month" value={month} onChange={e=>setMonth(e.target.value)}/></div></div>
-    <div className="filter-grid" style={{gridTemplateColumns:"repeat(7,1fr)"}}>
+    <div className="filter-grid" style={{gridTemplateColumns:"repeat(8,1fr)"}}>
+      <div><div className="field-label">Category</div><select className="select" value={category} onChange={e=>{setCategory(e.target.value);setDeeni("");setField("")}}><option value="">All</option>{meta.categories.map(x=><option key={x}>{x}</option>)}</select></div>
       <div><div className="field-label">Deeni Activities</div><select className="select" value={deeni} onChange={e=>{setDeeni(e.target.value);setField("")}}><option value="">All</option>{meta.deeniActivities.map(x=><option key={x}>{x}</option>)}</select></div>
       <div><div className="field-label">Fields</div><select className="select" value={field} onChange={e=>setField(e.target.value)}><option value="">All</option>{meta.fields.map(x=><option key={x}>{x}</option>)}</select></div>
       <div><div className="field-label">Region</div><select className="select" value={region} onChange={e=>setRegionAndClear(e.target.value)}><option value="">All</option>{meta.regions.map(x=><option key={x}>{x}</option>)}</select></div>

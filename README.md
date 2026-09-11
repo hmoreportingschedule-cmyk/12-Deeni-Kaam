@@ -52,3 +52,7 @@ Username: admin
 Password: change-me
 
 Change these before production.
+
+
+### Fields & Category Master
+The dashboard now includes the uploaded `Fileds With Category(1).xlsx` hierarchy as `public/data/fields-category.json`, used for Category → Deeni Activities → Fields filters.
