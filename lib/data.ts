@@ -7,6 +7,11 @@ export type Row = Record<string,string>;
 let cache: { rows: Row[]; loadedAt: number } | null = null;
 const CACHE_MS = 5 * 60 * 1000;
 
+// Google Sheet used as the default live data source.
+// DATA_SOURCE_URL in Vercel can still override this value.
+const DEFAULT_DATA_SOURCE_URL =
+  "https://docs.google.com/spreadsheets/d/1rNQuQ93JH4Yj1a7lCZ-WI58FFDXIxGPa/export?format=csv";
+
 type TaxonomyRow = { category: string; deeniActivities: string; fields: string };
 
 function loadTaxonomy(): TaxonomyRow[] {
@@ -87,7 +92,7 @@ async function getSourceText(url: string) {
 
 export async function loadRows() {
   if (cache && Date.now()-cache.loadedAt < CACHE_MS) return cache.rows;
-  const configured = (process.env.DATA_SOURCE_URL || "local").split(",").map(s=>s.trim()).filter(Boolean);
+  const configured = (process.env.DATA_SOURCE_URL || DEFAULT_DATA_SOURCE_URL).split(",").map(s=>s.trim()).filter(Boolean);
   const all: Row[] = [];
   for (const url of configured) {
     const text = await getSourceText(url);
