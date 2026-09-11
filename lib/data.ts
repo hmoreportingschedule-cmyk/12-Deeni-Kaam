@@ -146,24 +146,12 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
 
   const monthRows = rows.filter(r => eq(r.Month, params.month));
 
-  // Geographic drill-down:
-  // India -> State -> Division -> District.
-  // The selected geography determines the table's first/primary column.
-  let level: "COUNTRY" | "STATE" | "DIVISION" | "DISTRICT" = "COUNTRY";
-  let levelKey = "";
-  if (params.district) {
-    level = "DISTRICT";
-    levelKey = "District";
-  } else if (params.division) {
-    level = "DISTRICT";
-    levelKey = "District";
-  } else if (params.state) {
-    level = "DIVISION";
-    levelKey = "Division";
-  } else if (params.region) {
-    level = "STATE";
-    levelKey = "State";
-  }
+  // The detailed report is always district-wise after a month is selected.
+  // Region / State / Division filters only narrow the district list; they do
+  // not change the table into a State/Division summary. This keeps the full
+  // district report in one table and lets Report Value be totaled field-wise.
+  const level: "DISTRICT" = "DISTRICT";
+  const levelKey = "District";
 
   const scoped = monthRows.filter(r =>
     eq(r.Region, params.region) &&
@@ -186,9 +174,9 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
     eq(r.District, params.district)
   );
 
-  const geoValues = level === "COUNTRY"
-    ? ["India"]
-    : Array.from(new Set(sourceScope.map(r => r[levelKey]).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const geoValues = Array.from(
+    new Set(sourceScope.map(r => r.District).filter(Boolean))
+  ).sort((a,b)=>a.localeCompare(b));
 
   // Field-wise aggregation: each selected geography is grouped by the
   // Deeni Activity + Field shown in the filters/master hierarchy.
@@ -199,8 +187,8 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
   };
   const map = new Map<string,Agg>();
 
-  const getGeoKey=(r:Row)=> level === "COUNTRY" ? "India" : r[levelKey];
-  const getGeoBase=(geo:string)=> sourceScope.find(r => (level === "COUNTRY" ? "India" : r[levelKey]) === geo);
+  const getGeoKey=(r:Row)=>r.District;
+  const getGeoBase=(geo:string)=> sourceScope.find(r => r.District === geo);
 
   // For the table to show the selected dropdown names, use them when selected.
   // Otherwise use the actual field/activity names from the source rows.
@@ -242,7 +230,7 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
   // geographic unit so the user can see the complete coverage.
   if (!map.size) {
     for (const geo of geoValues) {
-      const base=getGeoBase(geo) || (level === "COUNTRY" ? monthRows[0] : undefined);
+      const base=getGeoBase(geo);
       if (!base) continue;
       const activity=params.deeni || "-";
       const fld=params.field || "-";
