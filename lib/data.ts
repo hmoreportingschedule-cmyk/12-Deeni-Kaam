@@ -26,11 +26,26 @@ function loadTaxonomy(): TaxonomyRow[] {
 const norm = (v: unknown) => String(v ?? "").trim();
 const lower = (v: unknown) => norm(v).toLowerCase();
 
+function headerKey(value: string) {
+  return norm(value)
+    .replace(/^\\uFEFF/, "")
+    .replace(/\\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 function pick(row: Row, names: string[]) {
-  for (const n of names) {
-    if (Object.prototype.hasOwnProperty.call(row,n) && norm(row[n]) !== "") return norm(row[n]);
+  const wanted = new Set(names.map(headerKey));
+  for (const key of Object.keys(row)) {
+    if (wanted.has(headerKey(key)) && norm(row[key]) !== "") return norm(row[key]);
   }
   return "";
+}
+
+function pickColumn(row: Row, oneBasedColumn: number) {
+  const keys = Object.keys(row);
+  const key = keys[oneBasedColumn - 1];
+  return key ? norm(row[key]) : "";
 }
 
 export function canonicalize(r: Row): Row {
@@ -75,14 +90,11 @@ export function canonicalize(r: Row): Row {
     }
   }
 
-  // IMPORTANT: In the Google Sheet, Report Value is Column K.
-  // Read Column K directly instead of relying on the header text.
-  // Object.keys() preserves the CSV column order returned by Papa Parse.
-  const sourceColumns = Object.keys(r);
-  const reportValueColumnK = sourceColumns.length >= 11
-    ? norm(r[sourceColumns[10]])
-    : "";
-  const valueRaw = reportValueColumnK;
+  // Google Sheet Column K is the authoritative Report Value column.
+  // Use the named header when present; if it is blank/mismatched, read the
+  // physical 11th CSV column (K) directly.
+  const valueRaw = pick(r, ["Report Value","Report_Value","Value","Report","Total","Qty","Quantity"])
+    || pickColumn(r, 11);
   const target26 = pick(r, ["Target 26% (Value)","Target 26%","Target_26Pct","Target 26"]);
   const target52 = pick(r, ["Target 52% (Value)","Target 52%","Target_52Pct","Target 52"]);
 
@@ -134,7 +146,14 @@ export async function loadRows() {
   return all;
 }
 
-const num=(v:string)=>Number(String(v||"0").replace(/,/g,""))||0;
+const num=(v:string)=>{
+  const raw=String(v??"").trim();
+  if(!raw) return 0;
+  const negative=/^\\(.*\\)$/.test(raw);
+  const cleaned=raw.replace(/[(),\\s₹$%]/g,"");
+  const n=Number(cleaned);
+  return Number.isFinite(n) ? (negative ? -Math.abs(n) : n) : 0;
+};
 const eq=(a:string,b:string)=>!b || lower(a)===lower(b);
 
 function displayGeoName(value: string, level: string) {
