@@ -25,8 +25,8 @@ export default function Dashboard({onLogout,username}:{onLogout:()=>void;usernam
  const totalReport=rows.reduce((s,r)=>s+r.report,0), totalTarget=rows.reduce((s,r)=>s+r[currentTarget],0);
  const achievement=totalTarget?totalReport/totalTarget*100:null;
  const top=useMemo(()=>rows.slice(0,10),[rows]);
- const header="DISTRICT";
- const headerValue=district||"All Districts";
+ const header = district || division ? "DISTRICT" : state ? "DIVISION" : region ? "STATE" : "COUNTRY";
+ const headerValue = district || division || state || region || "India";
 
  const changeFilters=(setter:any,clear:any[])=>{setter}; // no-op helper
  const setRegionAndClear=(v:string)=>{setRegion(v);setState("");setDivision("");setDistrict("")};
