@@ -130,20 +130,46 @@ export async function loadRows() {
 const num=(v:string)=>Number(String(v||"0").replace(/,/g,""))||0;
 const eq=(a:string,b:string)=>!b || lower(a)===lower(b);
 
+function displayGeoName(value: string, level: string) {
+  const v = norm(value);
+  if (!v) return "India";
+  if (level === "REGION") return v.replace(/\s+Region$/i, "");
+  if (level === "DIVISION") return v.replace(/\s+Division$/i, "");
+  return v;
+}
+
 export function aggregate(rows: Row[], params: Record<string,string>) {
-  // Month is mandatory for the district report. Once a month is selected,
-  // always build the table from ALL districts present in that month and then
-  // apply the selected Category/Activity/Field/geo filters to the values.
+  // A report month is mandatory. After the month is selected, aggregate the
+  // Google Sheet's Report Value column (Column K / canonical ReportValue)
+  // instead of displaying one raw source row.
+  if (!params.month) return [];
+
   const monthRows = rows.filter(r => eq(r.Month, params.month));
 
-  const districtScope = monthRows.filter(r =>
+  // Geographic drill-down:
+  // India -> State -> Division -> District.
+  // The selected geography determines the table's first/primary column.
+  let level: "COUNTRY" | "STATE" | "DIVISION" | "DISTRICT" = "COUNTRY";
+  let levelKey = "";
+  if (params.district) {
+    level = "DISTRICT";
+    levelKey = "District";
+  } else if (params.division) {
+    level = "DISTRICT";
+    levelKey = "District";
+  } else if (params.state) {
+    level = "DIVISION";
+    levelKey = "Division";
+  } else if (params.region) {
+    level = "STATE";
+    levelKey = "State";
+  }
+
+  const scoped = monthRows.filter(r =>
     eq(r.Region, params.region) &&
     eq(r.State, params.state) &&
     eq(r.Division, params.division) &&
-    eq(r.District, params.district)
-  );
-
-  const filtered = districtScope.filter(r =>
+    eq(r.District, params.district) &&
     eq(r.Category, params.category) &&
     eq(r.DeeniActivities, params.deeni) &&
     eq(r.Fields, params.field) &&
@@ -151,46 +177,98 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
     eq(r.Department, params.department)
   );
 
-  // Always show district-level rows after a month is selected. If a district
-  // has no matching data for the selected filters, keep it in the table with 0.
-  const districts = Array.from(new Set(districtScope.map(r => r.District).filter(Boolean)))
-    .sort((a,b)=>a.localeCompare(b));
+  // Keep every geographic unit visible even if its filtered report value is 0.
+  // This is what makes a Region/State/Division filter show all of its units.
+  const sourceScope = monthRows.filter(r =>
+    eq(r.Region, params.region) &&
+    eq(r.State, params.state) &&
+    eq(r.Division, params.division) &&
+    eq(r.District, params.district)
+  );
 
-  const map = new Map<string,{name:string;report:number;target26:number;target52:number;count:number;region:string;state:string;division:string;district:string;deeniActivities:string;fields:string;multipleFieldName:string;multipleFieldValue:string}>();
+  const geoValues = level === "COUNTRY"
+    ? ["India"]
+    : Array.from(new Set(sourceScope.map(r => r[levelKey]).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
 
-  for (const district of districts) {
-    const base = districtScope.find(r => r.District === district);
-    map.set(district, {
-      name: district,
-      report: 0,
-      target26: 0,
-      target52: 0,
-      count: 0,
-      region: base?.Region || "",
-      state: base?.State || "",
-      division: base?.Division || "",
-      district,
-      deeniActivities: "",
-      fields: "",
-      multipleFieldName: "",
-      multipleFieldValue: ""
+  // Field-wise aggregation: each selected geography is grouped by the
+  // Deeni Activity + Field shown in the filters/master hierarchy.
+  type Agg = {
+    key:string; name:string; report:number; target26:number; target52:number; count:number;
+    region:string; state:string; division:string; district:string;
+    deeniActivities:string; fields:string; multipleFieldName:string; multipleFieldValue:string;
+  };
+  const map = new Map<string,Agg>();
+
+  const getGeoKey=(r:Row)=> level === "COUNTRY" ? "India" : r[levelKey];
+  const getGeoBase=(geo:string)=> sourceScope.find(r => (level === "COUNTRY" ? "India" : r[levelKey]) === geo);
+
+  // For the table to show the selected dropdown names, use them when selected.
+  // Otherwise use the actual field/activity names from the source rows.
+  const groupRows = scoped.length ? scoped : [];
+  for (const r of groupRows) {
+    const geo = getGeoKey(r);
+    if (!geo) continue;
+    const activity = params.deeni || r.DeeniActivities || "-";
+    const fld = params.field || r.Fields || "-";
+    const key = `${geo}|||${activity}|||${fld}`;
+    const prev = map.get(key);
+    if (prev) {
+      prev.report += num(r.ReportValue);
+      prev.target26 += num(r.Target26);
+      prev.target52 += num(r.Target52);
+      prev.count++;
+      continue;
+    }
+    const base = getGeoBase(geo) || r;
+    map.set(key, {
+      key,
+      name: displayGeoName(geo, level),
+      report: num(r.ReportValue),
+      target26: num(r.Target26),
+      target52: num(r.Target52),
+      count: 1,
+      region: displayGeoName(base.Region || r.Region, "REGION"),
+      state: base.State || r.State || "",
+      division: displayGeoName(base.Division || r.Division, "DIVISION"),
+      district: base.District || r.District || "",
+      deeniActivities: activity,
+      fields: fld,
+      multipleFieldName: r.MultipleFieldName || "",
+      multipleFieldValue: r.MultipleFieldValue || ""
     });
   }
 
-  for (const r of filtered) {
-    const prev = map.get(r.District);
-    if (!prev) continue;
-    prev.report += num(r.ReportValue);
-    prev.target26 += num(r.Target26);
-    prev.target52 += num(r.Target52);
-    prev.count++;
+  // If the filters return no report rows, still return one zero row per
+  // geographic unit so the user can see the complete coverage.
+  if (!map.size) {
+    for (const geo of geoValues) {
+      const base=getGeoBase(geo) || (level === "COUNTRY" ? monthRows[0] : undefined);
+      if (!base) continue;
+      const activity=params.deeni || "-";
+      const fld=params.field || "-";
+      const key=`${geo}|||${activity}|||${fld}`;
+      map.set(key, {
+        key,
+        name: displayGeoName(geo, level),
+        report:0,target26:0,target52:0,count:0,
+        region:displayGeoName(base.Region,"REGION"),
+        state:base.State || "",
+        division:displayGeoName(base.Division,"DIVISION"),
+        district:base.District || "",
+        deeniActivities:activity,fields:fld,multipleFieldName:"",multipleFieldValue:""
+      });
+    }
   }
 
-  return Array.from(map.values()).map(x => ({
-    ...x,
-    achievement26: x.target26 ? x.report/x.target26*100 : null,
-    achievement52: x.target52 ? x.report/x.target52*100 : null
-  })).sort((a,b)=>a.name.localeCompare(b.name));
+  // If multiple fields are selected by leaving the Field filter on All,
+  // the rows above are already field-wise. Sort geography first, then activity/field.
+  return Array.from(map.values())
+    .map(x => ({
+      ...x,
+      achievement26: x.target26 ? x.report/x.target26*100 : null,
+      achievement52: x.target52 ? x.report/x.target52*100 : null
+    }))
+    .sort((a,b)=>a.name.localeCompare(b.name) || a.deeniActivities.localeCompare(b.deeniActivities) || a.fields.localeCompare(b.fields));
 }
 
 export function meta(rows: Row[], params: Record<string,string>) {
