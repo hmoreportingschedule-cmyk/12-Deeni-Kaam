@@ -26,11 +26,26 @@ function loadTaxonomy(): TaxonomyRow[] {
 const norm = (v: unknown) => String(v ?? "").trim();
 const lower = (v: unknown) => norm(v).toLowerCase();
 
+function headerKey(value: string) {
+  return norm(value).replace(/^\\uFEFF/, "").replace(/\\s+/g, " ").trim().toLowerCase();
+}
+
 function pick(row: Row, names: string[]) {
-  for (const n of names) {
-    if (Object.prototype.hasOwnProperty.call(row,n) && norm(row[n]) !== "") return norm(row[n]);
+  const wanted = new Set(names.map(headerKey));
+  for (const key of Object.keys(row)) {
+    if (wanted.has(headerKey(key)) && norm(row[key]) !== "") return norm(row[key]);
   }
   return "";
+}
+
+// Google Sheet column positions are 1-based. Column K = index 10.
+// This is intentionally used as a fallback for Report Value so the dashboard
+// always reads the value from the user's actual Column K, even if the header
+// text has a spelling/case/spacing difference.
+function pickColumn(row: Row, oneBasedColumn: number) {
+  const keys = Object.keys(row);
+  const key = keys[oneBasedColumn - 1];
+  return key ? norm(row[key]) : "";
 }
 
 export function canonicalize(r: Row): Row {
@@ -75,7 +90,10 @@ export function canonicalize(r: Row): Row {
     }
   }
 
-  const valueRaw = pick(r, ["Report Value","Report_Value","Value","Report","Total","Qty","Quantity"]);
+  // Report Value MUST come from Google Sheet Column K.
+  // Header matching is kept as a first choice, with Column K as the
+  // authoritative fallback requested for this dashboard.
+  const valueRaw = pick(r, ["Report Value","Report_Value","Value","Report","Total","Qty","Quantity"]) || pickColumn(r, 11);
   const target26 = pick(r, ["Target 26% (Value)","Target 26%","Target_26Pct","Target 26"]);
   const target52 = pick(r, ["Target 52% (Value)","Target 52%","Target_52Pct","Target 52"]);
 
