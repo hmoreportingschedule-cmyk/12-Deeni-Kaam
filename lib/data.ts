@@ -131,43 +131,66 @@ const num=(v:string)=>Number(String(v||"0").replace(/,/g,""))||0;
 const eq=(a:string,b:string)=>!b || lower(a)===lower(b);
 
 export function aggregate(rows: Row[], params: Record<string,string>) {
-  const filtered=rows.filter(r=>
-    eq(r.Month,params.month) &&
-    eq(r.Category,params.category) &&
-    eq(r.DeeniActivities,params.deeni) &&
-    eq(r.Fields,params.field) &&
-    eq(r.Region,params.region) &&
-    eq(r.State,params.state) &&
-    eq(r.Division,params.division) &&
-    eq(r.District,params.district) &&
-    eq(r.Chain,params.chain) &&
-    eq(r.Department,params.department)
+  // Month is mandatory for the district report. Once a month is selected,
+  // always build the table from ALL districts present in that month and then
+  // apply the selected Category/Activity/Field/geo filters to the values.
+  const monthRows = rows.filter(r => eq(r.Month, params.month));
+
+  const districtScope = monthRows.filter(r =>
+    eq(r.Region, params.region) &&
+    eq(r.State, params.state) &&
+    eq(r.Division, params.division) &&
+    eq(r.District, params.district)
   );
 
-  const level=params.district ? "district" : params.division ? "division" : params.state ? "state" : params.region ? "region" : "country";
-  const map=new Map<string,{name:string;report:number;target26:number;target52:number;count:number;region:string;state:string;division:string;district:string;deeniActivities:string;fields:string;multipleFieldName:string;multipleFieldValue:string}>();
+  const filtered = districtScope.filter(r =>
+    eq(r.Category, params.category) &&
+    eq(r.DeeniActivities, params.deeni) &&
+    eq(r.Fields, params.field) &&
+    eq(r.Chain, params.chain) &&
+    eq(r.Department, params.department)
+  );
 
-  for(const r of filtered){
-    const name=level==="country" ? "India" :
-      level==="region" ? r.State || "Unknown State" :
-      level==="state" ? r.Division || "Unknown Division" :
-      level==="division" ? r.District || "Unknown District" :
-      r.District || "Unknown District";
-    const key=`${name}|${r.Fields}|${r.DeeniActivities}|${r.MultipleFieldName}|${r.MultipleFieldValue}`;
-    const prev=map.get(key)||{name,report:0,target26:0,target52:0,count:0,region:r.Region,state:r.State,division:r.Division,district:r.District,deeniActivities:r.DeeniActivities,fields:r.Fields,multipleFieldName:r.MultipleFieldName,multipleFieldValue:r.MultipleFieldValue};
-    prev.report+=num(r.ReportValue); prev.target26+=num(r.Target26); prev.target52+=num(r.Target52); prev.count++;
-    map.set(key,prev);
+  // Always show district-level rows after a month is selected. If a district
+  // has no matching data for the selected filters, keep it in the table with 0.
+  const districts = Array.from(new Set(districtScope.map(r => r.District).filter(Boolean)))
+    .sort((a,b)=>a.localeCompare(b));
+
+  const map = new Map<string,{name:string;report:number;target26:number;target52:number;count:number;region:string;state:string;division:string;district:string;deeniActivities:string;fields:string;multipleFieldName:string;multipleFieldValue:string}>();
+
+  for (const district of districts) {
+    const base = districtScope.find(r => r.District === district);
+    map.set(district, {
+      name: district,
+      report: 0,
+      target26: 0,
+      target52: 0,
+      count: 0,
+      region: base?.Region || "",
+      state: base?.State || "",
+      division: base?.Division || "",
+      district,
+      deeniActivities: "",
+      fields: "",
+      multipleFieldName: "",
+      multipleFieldValue: ""
+    });
   }
 
-  return Array.from(map.values()).map(x=>({
+  for (const r of filtered) {
+    const prev = map.get(r.District);
+    if (!prev) continue;
+    prev.report += num(r.ReportValue);
+    prev.target26 += num(r.Target26);
+    prev.target52 += num(r.Target52);
+    prev.count++;
+  }
+
+  return Array.from(map.values()).map(x => ({
     ...x,
-    achievement26:x.target26?x.report/x.target26*100:null,
-    achievement52:x.target52?x.report/x.target52*100:null,
-    deeniActivities: x.deeniActivities || "",
-    fields: x.fields || "",
-    multipleFieldName: x.multipleFieldName || "",
-    multipleFieldValue: x.multipleFieldValue || ""
-  })).sort((a,b)=>b.report-a.report);
+    achievement26: x.target26 ? x.report/x.target26*100 : null,
+    achievement52: x.target52 ? x.report/x.target52*100 : null
+  })).sort((a,b)=>a.name.localeCompare(b.name));
 }
 
 export function meta(rows: Row[], params: Record<string,string>) {
