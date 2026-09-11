@@ -26,95 +26,79 @@ function loadTaxonomy(): TaxonomyRow[] {
 const norm = (v: unknown) => String(v ?? "").trim();
 const lower = (v: unknown) => norm(v).toLowerCase();
 
-function headerKey(value: string) {
-  return norm(value)
-    .replace(/^\\uFEFF/, "")
-    .replace(/\\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
 function pick(row: Row, names: string[]) {
-  const wanted = new Set(names.map(headerKey));
-  for (const key of Object.keys(row)) {
-    if (wanted.has(headerKey(key)) && norm(row[key]) !== "") return norm(row[key]);
+  for (const n of names) {
+    if (Object.prototype.hasOwnProperty.call(row,n) && norm(row[n]) !== "") return norm(row[n]);
   }
   return "";
 }
 
-function pickColumn(row: Row, oneBasedColumn: number) {
+function column(row: Row, index: number) {
   const keys = Object.keys(row);
-  const key = keys[oneBasedColumn - 1];
-  return key ? norm(row[key]) : "";
+  return index < keys.length ? norm(row[keys[index]]) : "";
 }
 
 export function canonicalize(r: Row): Row {
-  const monthRaw = pick(r, ["Month","Report Month","Month Name"]);
-  const yearRaw = pick(r, ["Year","Report Year"]);
-  let month = "";
+  // IMPORTANT: The supplied Google Sheet has a fixed A:M layout:
+  // A Month, B Year, C Chain, D Department, E Region, F State,
+  // G Division, H District, I Category, J Fileds, K Report Value,
+  // L Target 26% (Value), M Target 52% (Value).
+  // Read these columns by position so Report Value can never be taken from
+  // the wrong field because of a header spelling/wrapping difference.
 
-  // The Google Sheet uses separate Month + Year columns (e.g. January + 2026).
-  // Build YYYY-MM directly so named months do not get interpreted as year 2001
-  // by JavaScript's Date.parse().
+  const monthRaw = column(r, 0);
+  const yearRaw = column(r, 1);
+  const chain = column(r, 2);
+  const department = column(r, 3);
+  const region = column(r, 4);
+  const state = column(r, 5);
+  const division = column(r, 6);
+  const district = column(r, 7);
+  const category = column(r, 8);
+  const fields = column(r, 9);
+
+  // Column K = index 10. Do NOT substitute another column.
+  const reportValue = column(r, 10);
+
+  // Column L = index 11, Column M = index 12.
+  const target26 = column(r, 11);
+  const target52 = column(r, 12);
+
   const monthNames=["january","february","march","april","may","june","july","august","september","october","november","december"];
   const monthShort=["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+  const yearMatch=yearRaw.match(/\b(20\d{2})\b/);
+  const year=yearMatch ? yearMatch[1] : "";
 
-  const yMatch = yearRaw.match(/\b(20\d{2})\b/);
-  const year = yMatch ? yMatch[1] : "";
-
-  const monthText = monthRaw.toLowerCase().trim();
-  let monthNumber = 0;
+  let month="";
+  const mt=monthRaw.toLowerCase().trim();
 
   if (/^\d{4}[-/]\d{1,2}$/.test(monthRaw)) {
     const parts=monthRaw.replace(/\//g,"-").split("-");
-    month = `${parts[0]}-${parts[1].padStart(2,"0")}`;
-  } else if (/^\d{1,2}$/.test(monthText)) {
-    monthNumber=Number(monthText);
+    month=`${parts[0]}-${parts[1].padStart(2,"0")}`;
   } else {
-    const fullIndex=monthNames.indexOf(monthText);
-    const shortIndex=monthShort.indexOf(monthText.slice(0,3));
-    monthNumber=fullIndex>=0 ? fullIndex+1 : shortIndex>=0 ? shortIndex+1 : 0;
+    const full=monthNames.indexOf(mt);
+    const short=monthShort.indexOf(mt.slice(0,3));
+    const n=/^\d{1,2}$/.test(mt) ? Number(mt) : full>=0 ? full+1 : short>=0 ? short+1 : 0;
+    if(n>=1 && n<=12 && year) month=`${year}-${String(n).padStart(2,"0")}`;
   }
-
-  if (!month && monthNumber>=1 && monthNumber<=12 && year) {
-    month=`${year}-${String(monthNumber).padStart(2,"0")}`;
-  }
-
-  // Handle a true date value only when Month itself contains a date.
-  if (!month && monthRaw) {
-    const parsed=Date.parse(monthRaw);
-    if (!Number.isNaN(parsed)) {
-      const d=new Date(parsed);
-      const parsedYear=year || String(d.getFullYear());
-      month=`${parsedYear}-${String(d.getMonth()+1).padStart(2,"0")}`;
-    }
-  }
-
-  // Google Sheet Column K is the authoritative Report Value column.
-  // Use the named header when present; if it is blank/mismatched, read the
-  // physical 11th CSV column (K) directly.
-  const valueRaw = pick(r, ["Report Value","Report_Value","Value","Report","Total","Qty","Quantity"])
-    || pickColumn(r, 11);
-  const target26 = pick(r, ["Target 26% (Value)","Target 26%","Target_26Pct","Target 26"]);
-  const target52 = pick(r, ["Target 52% (Value)","Target 52%","Target_52Pct","Target 52"]);
 
   return {
     Month: month,
-    Year: year || (month.match(/^\d{4}/)?.[0] || ""),
-    Category: pick(r, ["Category"]),
-    DeeniActivities: pick(r, ["Deeni Activities","Deeni Activity","Deeni Kaam"]),
-    Fields: pick(r, ["Fields","Fileds","Field"]),
-    MultipleFieldName: pick(r, ["Multiple Field Name","Multiple_Field_Name"]),
-    MultipleFieldValue: pick(r, ["Multiple Field Value","Multiple_Field_Value"]),
-    Chain: pick(r, ["Chain"]),
-    Department: pick(r, ["Department"]),
-    Region: pick(r, ["Region"]),
-    State: pick(r, ["State"]),
-    Division: pick(r, ["Division"]),
-    District: pick(r, ["District"]),
-    ReportValue: valueRaw.replace(/,/g,""),
-    Target26: target26.replace(/,/g,""),
-    Target52: target52.replace(/,/g,"")
+    Year: year,
+    Category: category,
+    DeeniActivities: "",
+    Fields: fields,
+    MultipleFieldName: "",
+    MultipleFieldValue: "",
+    Chain: chain,
+    Department: department,
+    Region: region,
+    State: state,
+    Division: division,
+    District: district,
+    ReportValue: reportValue,
+    Target26: target26,
+    Target52: target52
   };
 }
 
@@ -135,7 +119,7 @@ async function getSourceText(url: string) {
 
 export async function loadRows() {
   if (cache && Date.now()-cache.loadedAt < CACHE_MS) return cache.rows;
-  const configured = (process.env.DATA_SOURCE_URL || DEFAULT_DATA_SOURCE_URL).split(",").map(s=>s.trim()).filter(Boolean);
+  const configured = [DEFAULT_DATA_SOURCE_URL];
   const all: Row[] = [];
   for (const url of configured) {
     const text = await getSourceText(url);
@@ -149,8 +133,8 @@ export async function loadRows() {
 const num=(v:string)=>{
   const raw=String(v??"").trim();
   if(!raw) return 0;
-  const negative=/^\\(.*\\)$/.test(raw);
-  const cleaned=raw.replace(/[(),\\s₹$%]/g,"");
+  const negative=/^\(.*\)$/.test(raw);
+  const cleaned=raw.replace(/[(),\s₹$%]/g,"");
   const n=Number(cleaned);
   return Number.isFinite(n) ? (negative ? -Math.abs(n) : n) : 0;
 };
@@ -211,6 +195,14 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
     region:string; state:string; division:string; district:string;
     deeniActivities:string; fields:string; multipleFieldName:string; multipleFieldValue:string;
   };
+  const taxonomy=loadTaxonomy();
+  const activityByField=new Map<string,string>();
+  for(const t of taxonomy){
+    if(t.fields && t.deeniActivities && !activityByField.has(lower(t.fields))){
+      activityByField.set(lower(t.fields), t.deeniActivities);
+    }
+  }
+
   const map = new Map<string,Agg>();
 
   const getGeoKey=(r:Row)=>r.District;
@@ -222,7 +214,7 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
   for (const r of groupRows) {
     const geo = getGeoKey(r);
     if (!geo) continue;
-    const activity = params.deeni || r.DeeniActivities || "-";
+    const activity = params.deeni || r.DeeniActivities || activityByField.get(lower(r.Fields)) || "-";
     const fld = params.field || r.Fields || "-";
     const key = `${geo}|||${activity}|||${fld}`;
     const prev = map.get(key);
@@ -287,13 +279,12 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
 
 export function meta(rows: Row[], params: Record<string,string>) {
   const dataFiltered = rows.filter(r=>
-    eq(r.Category,params.category) &&
-    eq(r.DeeniActivities,params.deeni) &&
-    eq(r.Fields,params.field) &&
     eq(r.Region,params.region) &&
     eq(r.State,params.state) &&
     eq(r.Division,params.division) &&
-    eq(r.District,params.district)
+    eq(r.District,params.district) &&
+    eq(r.Category,params.category) &&
+    eq(r.Fields,params.field)
   );
 
   const uniq=(key:string)=>Array.from(new Set(dataFiltered.map(r=>r[key]).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
