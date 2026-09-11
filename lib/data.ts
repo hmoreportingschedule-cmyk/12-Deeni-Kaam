@@ -34,32 +34,56 @@ function pick(row: Row, names: string[]) {
 }
 
 export function canonicalize(r: Row): Row {
-  const monthRaw = pick(r, ["Month","Report Month","Month Name","Date","Report Date"]);
-  let month = monthRaw;
-  if (/^\d{4}-\d{1,2}$/.test(monthRaw)) {
-    const [y,m] = monthRaw.split("-");
-    month = `${y}-${m.padStart(2,"0")}`;
+  const monthRaw = pick(r, ["Month","Report Month","Month Name"]);
+  const yearRaw = pick(r, ["Year","Report Year"]);
+  let month = "";
+
+  // The Google Sheet uses separate Month + Year columns (e.g. January + 2026).
+  // Build YYYY-MM directly so named months do not get interpreted as year 2001
+  // by JavaScript's Date.parse().
+  const monthNames=["january","february","march","april","may","june","july","august","september","october","november","december"];
+  const monthShort=["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+
+  const yMatch = yearRaw.match(/\b(20\d{2})\b/);
+  const year = yMatch ? yMatch[1] : "";
+
+  const monthText = monthRaw.toLowerCase().trim();
+  let monthNumber = 0;
+
+  if (/^\d{4}[-/]\d{1,2}$/.test(monthRaw)) {
+    const parts=monthRaw.replace(/\//g,"-").split("-");
+    month = `${parts[0]}-${parts[1].padStart(2,"0")}`;
+  } else if (/^\d{1,2}$/.test(monthText)) {
+    monthNumber=Number(monthText);
   } else {
-    const parsed = Date.parse(monthRaw);
+    const fullIndex=monthNames.indexOf(monthText);
+    const shortIndex=monthShort.indexOf(monthText.slice(0,3));
+    monthNumber=fullIndex>=0 ? fullIndex+1 : shortIndex>=0 ? shortIndex+1 : 0;
+  }
+
+  if (!month && monthNumber>=1 && monthNumber<=12 && year) {
+    month=`${year}-${String(monthNumber).padStart(2,"0")}`;
+  }
+
+  // Handle a true date value only when Month itself contains a date.
+  if (!month && monthRaw) {
+    const parsed=Date.parse(monthRaw);
     if (!Number.isNaN(parsed)) {
-      const d = new Date(parsed);
-      month = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-    } else {
-      const m = monthRaw.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(\d{4})/i);
-      if (m) {
-        const names=["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
-        month=`${m[2]}-${String(names.indexOf(m[1].slice(0,3).toLowerCase())+1).padStart(2,"0")}`;
-      }
+      const d=new Date(parsed);
+      const parsedYear=year || String(d.getFullYear());
+      month=`${parsedYear}-${String(d.getMonth()+1).padStart(2,"0")}`;
     }
   }
+
   const valueRaw = pick(r, ["Report Value","Report_Value","Value","Report","Total","Qty","Quantity"]);
   const target26 = pick(r, ["Target 26% (Value)","Target 26%","Target_26Pct","Target 26"]);
   const target52 = pick(r, ["Target 52% (Value)","Target 52%","Target_52Pct","Target 52"]);
+
   return {
     Month: month,
-    Year: pick(r, ["Year"]) || month.slice(0,4),
+    Year: year || (month.match(/^\d{4}/)?.[0] || ""),
     Category: pick(r, ["Category"]),
-    DeeniActivities: pick(r, ["Deeni Activities","Deeni Activity","Deeni Kaam","Deeni Activities"]),
+    DeeniActivities: pick(r, ["Deeni Activities","Deeni Activity","Deeni Kaam"]),
     Fields: pick(r, ["Fields","Fileds","Field"]),
     MultipleFieldName: pick(r, ["Multiple Field Name","Multiple_Field_Name"]),
     MultipleFieldValue: pick(r, ["Multiple Field Value","Multiple_Field_Value"]),
