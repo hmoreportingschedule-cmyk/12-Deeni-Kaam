@@ -143,19 +143,10 @@ function displayGeoName(value: string, level: string) {
 }
 
 export function aggregate(rows: Row[], params: Record<string,string>) {
-  // A report month is mandatory. After the month is selected, aggregate the
-  // Google Sheet's Report Value column (Column K / canonical ReportValue)
-  // instead of displaying one raw source row.
   if (!params.month) return [];
 
   const monthRows = rows.filter(r => eq(r.Month, params.month));
-
-  // The detailed report is always district-wise after a month is selected.
-  // Region / State / Division filters only narrow the district list; they do
-  // not change the table into a State/Division summary. This keeps the full
-  // district report in one table and lets Report Value be totaled field-wise.
-  const level: "DISTRICT" = "DISTRICT";
-  const levelKey = "District";
+  const level = (params.level || "COUNTRY").toUpperCase() as "COUNTRY" | "REGION" | "STATE" | "DIVISION";
 
   const scoped = monthRows.filter(r =>
     eq(r.Region, params.region) &&
@@ -169,26 +160,12 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
     eq(r.Department, params.department)
   );
 
-  // Keep every geographic unit visible even if its filtered report value is 0.
-  // This is what makes a Region/State/Division filter show all of its units.
-  const sourceScope = monthRows.filter(r =>
-    eq(r.Region, params.region) &&
-    eq(r.State, params.state) &&
-    eq(r.Division, params.division) &&
-    eq(r.District, params.district)
-  );
-
-  const geoValues = Array.from(
-    new Set(sourceScope.map(r => r.District).filter(Boolean))
-  ).sort((a,b)=>a.localeCompare(b));
-
-  // Field-wise aggregation: each selected geography is grouped by the
-  // Deeni Activity + Field shown in the filters/master hierarchy.
   type Agg = {
     key:string; name:string; report:number; target26:number; target52:number; count:number;
     region:string; state:string; division:string; district:string;
     deeniActivities:string; fields:string; multipleFieldName:string; multipleFieldValue:string;
   };
+
   const taxonomy=loadTaxonomy();
   const activityByField=new Map<string,string>();
   for(const t of taxonomy){
@@ -199,19 +176,28 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
 
   const map = new Map<string,Agg>();
 
-  const getGeoKey=(r:Row)=>r.District;
-  const getGeoBase=(geo:string)=> sourceScope.find(r => r.District === geo);
+  const getLevelValue=(r:Row)=>{
+    if(level === "REGION") return r.Region;
+    if(level === "STATE") return r.State;
+    if(level === "DIVISION") return r.Division;
+    return "India";
+  };
 
-  // For the table to show the selected dropdown names, use them when selected.
-  // Otherwise use the actual field/activity names from the source rows.
-  const groupRows = scoped.length ? scoped : [];
-  for (const r of groupRows) {
-    const geo = getGeoKey(r);
-    if (!geo) continue;
+  const getLevelDisplay=(r:Row)=>{
+    const value=getLevelValue(r);
+    return level === "COUNTRY" ? "India" : displayGeoName(value, level);
+  };
+
+  for (const r of scoped) {
+    const geoValue=getLevelValue(r);
+    if(level !== "COUNTRY" && !geoValue) continue;
+
     const activity = params.deeni || r.DeeniActivities || activityByField.get(lower(r.Fields)) || "-";
     const fld = params.field || r.Fields || "-";
-    const key = `${geo}|||${activity}|||${fld}`;
+    const geoKey = level === "COUNTRY" ? "India" : lower(geoValue);
+    const key = `${geoKey}|||${lower(activity)}|||${lower(fld)}`;
     const prev = map.get(key);
+
     if (prev) {
       prev.report += num(r.ReportValue);
       prev.target26 += num(r.Target26);
@@ -219,18 +205,20 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
       prev.count++;
       continue;
     }
-    const base = getGeoBase(geo) || r;
+
     map.set(key, {
       key,
-      name: displayGeoName(geo, level),
+      name: getLevelDisplay(r),
       report: num(r.ReportValue),
       target26: num(r.Target26),
       target52: num(r.Target52),
       count: 1,
-      region: displayGeoName(base.Region || r.Region, "REGION"),
-      state: base.State || r.State || "",
-      division: displayGeoName(base.Division || r.Division, "DIVISION"),
-      district: base.District || r.District || "",
+      // Keep the hierarchy columns meaningful for the selected report level.
+      // Non-selected lower levels are shown as All because the values are totals.
+      region: level === "REGION" ? displayGeoName(r.Region, "REGION") : level === "COUNTRY" ? "All" : level === "STATE" || level === "DIVISION" ? displayGeoName(r.Region, "REGION") : "All",
+      state: level === "STATE" ? r.State : level === "DIVISION" ? r.State : "All",
+      division: level === "DIVISION" ? displayGeoName(r.Division, "DIVISION") : "All",
+      district: "All",
       deeniActivities: activity,
       fields: fld,
       multipleFieldName: r.MultipleFieldName || "",
@@ -238,30 +226,6 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
     });
   }
 
-  // If the filters return no report rows, still return one zero row per
-  // geographic unit so the user can see the complete coverage.
-  if (!map.size) {
-    for (const geo of geoValues) {
-      const base=getGeoBase(geo);
-      if (!base) continue;
-      const activity=params.deeni || "-";
-      const fld=params.field || "-";
-      const key=`${geo}|||${activity}|||${fld}`;
-      map.set(key, {
-        key,
-        name: displayGeoName(geo, level),
-        report:0,target26:0,target52:0,count:0,
-        region:displayGeoName(base.Region,"REGION"),
-        state:base.State || "",
-        division:displayGeoName(base.Division,"DIVISION"),
-        district:base.District || "",
-        deeniActivities:activity,fields:fld,multipleFieldName:"",multipleFieldValue:""
-      });
-    }
-  }
-
-  // If multiple fields are selected by leaving the Field filter on All,
-  // the rows above are already field-wise. Sort geography first, then activity/field.
   return Array.from(map.values())
     .map(x => ({
       ...x,
