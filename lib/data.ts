@@ -163,6 +163,7 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
   type Agg = {
     key:string; name:string; report:number; target26:number; target52:number; count:number;
     region:string; state:string; division:string; district:string;
+    regionSet:Set<string>; stateSet:Set<string>; divisionSet:Set<string>; districtSet:Set<string>;
     deeniActivities:string; fields:string; multipleFieldName:string; multipleFieldValue:string;
   };
 
@@ -203,6 +204,10 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
       prev.target26 += num(r.Target26);
       prev.target52 += num(r.Target52);
       prev.count++;
+      if (r.Region) prev.regionSet.add(displayGeoName(r.Region, "REGION"));
+      if (r.State) prev.stateSet.add(r.State);
+      if (r.Division) prev.divisionSet.add(displayGeoName(r.Division, "DIVISION"));
+      if (r.District) prev.districtSet.add(r.District);
       continue;
     }
 
@@ -213,12 +218,17 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
       target26: num(r.Target26),
       target52: num(r.Target52),
       count: 1,
-      // Keep the hierarchy columns meaningful for the selected report level.
-      // Non-selected lower levels are shown as All because the values are totals.
-      region: level === "REGION" ? displayGeoName(r.Region, "REGION") : level === "COUNTRY" ? "All" : level === "STATE" || level === "DIVISION" ? displayGeoName(r.Region, "REGION") : "All",
-      state: level === "STATE" ? r.State : level === "DIVISION" ? r.State : "All",
-      division: level === "DIVISION" ? displayGeoName(r.Division, "DIVISION") : "All",
-      district: "All",
+      // Keep every hierarchy column populated with the actual names represented
+      // by the aggregated total. Multiple values are joined instead of showing
+      // a misleading "All".
+      region: "",
+      state: "",
+      division: "",
+      district: "",
+      regionSet: new Set(r.Region ? [displayGeoName(r.Region, "REGION")] : []),
+      stateSet: new Set(r.State ? [r.State] : []),
+      divisionSet: new Set(r.Division ? [displayGeoName(r.Division, "DIVISION")] : []),
+      districtSet: new Set(r.District ? [r.District] : []),
       deeniActivities: activity,
       fields: fld,
       multipleFieldName: r.MultipleFieldName || "",
@@ -229,6 +239,10 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
   return Array.from(map.values())
     .map(x => ({
       ...x,
+      region: Array.from(x.regionSet).sort((a,b)=>a.localeCompare(b)).join(", ") || "-",
+      state: Array.from(x.stateSet).sort((a,b)=>a.localeCompare(b)).join(", ") || "-",
+      division: Array.from(x.divisionSet).sort((a,b)=>a.localeCompare(b)).join(", ") || "-",
+      district: Array.from(x.districtSet).sort((a,b)=>a.localeCompare(b)).join(", ") || "-",
       achievement26: x.target26 ? x.report/x.target26*100 : null,
       achievement52: x.target52 ? x.report/x.target52*100 : null
     }))
