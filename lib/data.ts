@@ -239,10 +239,12 @@ export function aggregate(rows: Row[], params: Record<string,string>) {
   return Array.from(map.values())
     .map(x => ({
       ...x,
-      region: Array.from(x.regionSet).sort((a,b)=>a.localeCompare(b)).join(", ") || "-",
-      state: Array.from(x.stateSet).sort((a,b)=>a.localeCompare(b)).join(", ") || "-",
-      division: Array.from(x.divisionSet).sort((a,b)=>a.localeCompare(b)).join(", ") || "-",
-      district: Array.from(x.districtSet).sort((a,b)=>a.localeCompare(b)).join(", ") || "-",
+      // Keep the hierarchy columns tied to the selected aggregation level.
+      // Never dump hundreds of child geography names into one cell.
+      region: level === "COUNTRY" ? "" : level === "REGION" ? Array.from(x.regionSet)[0] || "-" : Array.from(x.regionSet)[0] || "-",
+      state: level === "STATE" || level === "DIVISION" ? Array.from(x.stateSet)[0] || "-" : "",
+      division: level === "DIVISION" ? Array.from(x.divisionSet)[0] || "-" : "",
+      district: "",
       achievement26: x.target26 ? x.report/x.target26*100 : null,
       achievement52: x.target52 ? x.report/x.target52*100 : null
     }))
