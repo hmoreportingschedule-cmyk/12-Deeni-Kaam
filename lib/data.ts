@@ -10,7 +10,7 @@ const CACHE_MS = 5 * 60 * 1000;
 // Google Sheet used as the default live data source.
 // DATA_SOURCE_URL in Vercel can still override this value.
 const DEFAULT_DATA_SOURCE_URL =
-  "https://docs.google.com/spreadsheets/d/1rNQuQ93JH4Yj1a7lCZ-WI58FFDXIxGPa/export?format=csv";
+  "https://docs.google.com/spreadsheets/d/1rNQuQ93JH4Yj1a7lCZ-WI58FFDXIxGPa/gviz/tq?tqx=out:csv&sheet=Row%20Data%202026&headers=1";
 
 type TaxonomyRow = { category: string; deeniActivities: string; fields: string };
 
@@ -58,7 +58,7 @@ export function canonicalize(r: Row): Row {
   const fields = column(r, 9);
 
   // Column K = index 10. Do NOT substitute another column.
-  const reportValue = column(r, 10);
+  const reportValue = column(r, 10); // GOOGLE SHEET COLUMN K
 
   // Column L = index 11, Column M = index 12.
   const target26 = column(r, 11);
@@ -106,13 +106,7 @@ async function getSourceText(url: string) {
   if (url === "local") {
     return fs.readFileSync(path.join(process.cwd(),"public/data/report.csv"),"utf8");
   }
-  const u = url.trim();
-  let target = u;
-  const match = u.match(/docs\.google\.com\/spreadsheets\/d\/([^/]+)/);
-  if (match && !/export\?format=csv/i.test(u)) {
-    target = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
-  }
-  const res = await fetch(target,{cache:"no-store"});
+  const res = await fetch(url.trim(),{cache:"no-store"});
   if (!res.ok) throw new Error(`Source returned ${res.status}`);
   return res.text();
 }
