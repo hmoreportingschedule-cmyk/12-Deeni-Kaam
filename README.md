@@ -1,68 +1,46 @@
-# Reporting & Analise Dashboard — Vercel + Google Sheets
+# Reporting & Analise Dashboard — Final Login Fix
 
-## Build fix included
-- The TypeScript `Set` iteration build error is permanently addressed by using `Array.from(new Set(...))` and an explicit `tsconfig.json` with ES2017 + `downlevelIteration`. Vercel will therefore not depend on an auto-generated ES5 TypeScript target.
+This version fixes the browser `Failed to fetch` problem by routing all Google Apps Script requests through a Next.js server-side API route. The browser no longer calls the Google Apps Script URL directly, so Apps Script redirect/CORS behavior does not break login.
 
-## What is included
-- Excel formula-ready template: `Reporting_Analise_Dashboard_Template.xlsx`
-- Next.js dashboard for Vercel
-- Google Apps Script API for Google Sheets
-- Login with admin/user roles
-- Admin user creation/update
-- 12 Deeni Kaam and Department dashboard tabs
-- Filters: Chain, Level, Region, State, Division, District
-- Month/Year, Quarter, Target 52%/26%
-- Month-to-month comparison
-- Average-to-month view
-- Quarter comparison structure
-- Activity, Region, State, Division and District ranking
-- Graph + KPI cards
-- District as base reporting grain
+## Included
+- Next.js + React + Recharts dashboard
+- Server-side `/api/gas` proxy to Google Apps Script
+- 12 Deeni Kaam dashboard
+- Department dashboard
+- Login + admin/user management
+- Google Sheets backend
+- Target 52% / 26%
+- Month/year and geographic filters
+- Ranking and charts
+- Excel template
+- TypeScript-safe unique list code (no `[...new Set()]`)
 
-## Google Sheet setup
-1. Create a Google Sheet.
-2. Open Extensions → Apps Script.
-3. Paste `apps-script/Code.gs`.
-4. Run `setupSheets()` once and authorize it.
-5. Deploy → New deployment → Web app.
-6. Execute as: Me. Who has access: Anyone.
-7. Copy the `/exec` URL.
-8. The supplied `app/page.tsx` already contains the provided Google Apps Script `/exec` URL, so no Vercel Environment Variable is required for this version.
-9. If you later change the Google Apps Script deployment URL, replace the `API` constant in `app/page.tsx` in both locations.
+## Google Apps Script URL
+Already configured in:
+`app/api/gas/route.ts`
 
-The script creates:
-- `Users`
-- `Row Data (12 Deeni)`
-- `Row Data (Department)`
-- `Geo Master`
-- `Activity Master`
-- `Department Master`
+## Google Apps Script setup
+1. Open Google Sheet → Extensions → Apps Script.
+2. Paste `apps-script/Code.gs`.
+3. Run `setupSheets()` once and authorize.
+4. Deploy → New deployment → Web app.
+5. Execute as: Me.
+6. Who has access: Anyone.
+7. Make sure the deployed URL is the same `/exec` URL configured in `app/api/gas/route.ts`.
 
-## Default login
-After setup, `setupSheets()` creates an admin account:
-- Email: admin@example.com
-- Password: ChangeMe123!
+## Default admin
+Email: `admin@example.com`
+Password: `ChangeMe123!`
 
-Change this password immediately by creating/updating the admin user from the app.
+Run `setupSheets()` once before login. Change the default password after setup.
 
 ## Vercel
-No `NEXT_PUBLIC_GAS_API` environment variable is required in this fixed build.
-
-```bash
-npm install
-npm run build
-```
-Push to GitHub, import the repository into Vercel, and add:
-`NEXT_PUBLIC_GAS_API` = your Apps Script `/exec` URL.
-
-## Data model
-For 12 Deeni:
-Month | Year | Chain | Region | State | Division | Distric | Pincode | Category | Activity | Report | Target52 | Target26
-
-For Department:
-Month | Year | Department | Frequency | Region | State | Division | Distric | Pincode | Activity/Work | Report | Target | Achievement
+Upload/replace the project files in GitHub. Then deploy the new commit. No `NEXT_PUBLIC_GAS_API` environment variable is required in this version.
 
 ## Important
-The sample geography/activity values are placeholders. Replace the master sheets with your complete India Region → State → Division → District → Pincode hierarchy. The web dashboard aggregates from district rows, so entering one row per district/activity/month is the recommended grain.
+Do not deploy only an old commit. Confirm the new commit contains:
+- `app/api/gas/route.ts`
+- `app/page.tsx` using `/api/gas`
+- `tsconfig.json`
 
-For production security, restrict the Apps Script deployment/access strategy and rotate the default admin password before use.
+The server proxy is the permanent fix for the browser-side `Failed to fetch` error caused by direct Apps Script requests.

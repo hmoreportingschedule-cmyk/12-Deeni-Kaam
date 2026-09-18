@@ -3,7 +3,7 @@ import React,{useEffect,useMemo,useState} from "react";
 import {BarChart,Bar,LineChart,Line,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer} from "recharts";
 
 type Row={Month:string;Year:number;Chain:string;Region:string;State:string;Division:string;Distric:string;Pincode:string;Category:string;Activity:string;Report:number;Target52:number;Target26:number;};
-const API="https://script.google.com/macros/s/AKfycbyFg2I6bniQnRRDDC3iV1hc92Q3rzWwqNuW3AdRecK5db3noX4yYavrBCla-Ev-KozN/exec";
+const API="/api/gas";
 const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const years=Array.from({length:10},(_,i)=>2022+i);
 const quarters=["Q1","Q2","Q3","Q4"];
@@ -25,7 +25,7 @@ export default function Home(){
  useEffect(()=>{const u=localStorage.getItem("rpt_user");if(u){setUser(JSON.parse(u));setLogin(false);load(JSON.parse(u).token)}},[]);
  async function api(action:string,payload:any={},token?:string){
     const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload,token:token||user?.token})});
-   const j=await r.json(); if(!j.ok) throw new Error(j.error||"API error"); return j;
+   const j=await r.json().catch(()=>({ok:false,error:`Server returned HTTP ${r.status}`})); if(!j.ok) throw new Error(j.error||"API error"); return j;
  }
  async function doLogin(){
    setBusy(true);setErr("");try{const j=await api("login",{email,password});localStorage.setItem("rpt_user",JSON.stringify(j.user));setUser(j.user);setLogin(false);await load(j.user.token)}catch(e:any){setErr(e.message)}finally{setBusy(false)}
@@ -91,6 +91,6 @@ function Rank({title,data}:{title:string,data:any[]}){return <div className="car
 
 function Admin({users,onDone}:{users:any[],onDone:()=>void}){
  const [name,setName]=useState(""),[email,setEmail]=useState(""),[password,setPassword]=useState(""),[role,setRole]=useState("user"),[msg,setMsg]=useState("");
- async function save(){try{const API="https://script.google.com/macros/s/AKfycbyFg2I6bniQnRRDDC3iV1hc92Q3rzWwqNuW3AdRecK5db3noX4yYavrBCla-Ev-KozN/exec";const token=JSON.parse(localStorage.getItem("rpt_user")||"{}").token;const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"user_create",token,name,email,password,role})});const j=await r.json();if(!j.ok)throw Error(j.error);setMsg("User created");setName("");setEmail("");setPassword("");onDone()}catch(e:any){setMsg(e.message)}}
+ async function save(){try{const API="/api/gas";const token=JSON.parse(localStorage.getItem("rpt_user")||"{}").token;const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"user_create",token,name,email,password,role})});const j=await r.json();if(!j.ok)throw Error(j.error);setMsg("User created");setName("");setEmail("");setPassword("");onDone()}catch(e:any){setMsg(e.message)}}
  return <section className="card admin"><h2>Admin — User Management</h2><div className="adminform"><input placeholder="Name" value={name} onChange={e=>setName(e.target.value)}/><input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)}/><input placeholder="Temporary password" value={password} onChange={e=>setPassword(e.target.value)}/><select value={role} onChange={e=>setRole(e.target.value)}><option value="user">User</option><option value="admin">Admin</option></select><button onClick={save}>Create / Update User</button></div>{msg&&<p>{msg}</p>}<div className="userlist">{users.map(u=><div key={u.email}>{u.name} — {u.email} — <b>{u.role}</b> — {u.active?"Active":"Disabled"}</div>)}</div></section>
 }
