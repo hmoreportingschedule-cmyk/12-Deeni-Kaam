@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           error: `Google Apps Script did not recognize action: ${action || "(empty)"}. Please deploy the latest Code.gs version.`,
-          receivedAction: data.receivedAction ?? action || null,
-          receivedKeys: data.receivedKeys ?? [],
+          receivedAction: data.receivedAction != null ? data.receivedAction : (action || null),
+          receivedKeys: Array.isArray(data.receivedKeys) ? data.receivedKeys : [],
         },
         { status: 502 }
       );
