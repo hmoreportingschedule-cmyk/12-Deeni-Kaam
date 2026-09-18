@@ -1,58 +1,63 @@
-# 12 Deeni Kaam Report Dashboard — Professional Vercel Starter
+# Reporting & Analise Dashboard — Vercel + Google Sheets
 
-## Features
-- Attractive login page based on the supplied reference image
-- Secure server-side login session using HTTP-only cookie
-- Dashboard date picker: Month + Year
-- Live DD-MM-YYYY and HH:MM:SS
-- Report By Table / Report By Graph
-- Connected dropdowns: Deeni Activities → Fields → Region → State → Division → District
-- 26% / 52% target selector
-- India → Region → State → Division → District reporting hierarchy
-- KPI cards: Total Report, Target, Achievement, Target Gap, Performance Status
-- CSV export
-- Google Sheets CSV export URL or local CSV source
-- Server-side data loading so the browser does not directly download the full Google Sheet
-- 5-minute server cache per Vercel function instance
+## What is included
+- Excel formula-ready template: `Reporting_Analise_Dashboard_Template.xlsx`
+- Next.js dashboard for Vercel
+- Google Apps Script API for Google Sheets
+- Login with admin/user roles
+- Admin user creation/update
+- 12 Deeni Kaam and Department dashboard tabs
+- Filters: Chain, Level, Region, State, Division, District
+- Month/Year, Quarter, Target 52%/26%
+- Month-to-month comparison
+- Average-to-month view
+- Quarter comparison structure
+- Activity, Region, State, Division and District ranking
+- Graph + KPI cards
+- District as base reporting grain
 
-## 1. Install
+## Google Sheet setup
+1. Create a Google Sheet.
+2. Open Extensions → Apps Script.
+3. Paste `apps-script/Code.gs`.
+4. Run `setupSheets()` once and authorize it.
+5. Deploy → New deployment → Web app.
+6. Execute as: Me. Who has access: Anyone.
+7. Copy the `/exec` URL.
+8. Create `.env.local` from `.env.example` and set:
+   NEXT_PUBLIC_GAS_API=YOUR_EXEC_URL
+
+The script creates:
+- `Users`
+- `Row Data (12 Deeni)`
+- `Row Data (Department)`
+- `Geo Master`
+- `Activity Master`
+- `Department Master`
+
+## Default login
+After setup, `setupSheets()` creates an admin account:
+- Email: admin@example.com
+- Password: ChangeMe123!
+
+Change this password immediately by creating/updating the admin user from the app.
+
+## Vercel
+```bash
 npm install
+npm run build
+```
+Push to GitHub, import the repository into Vercel, and add:
+`NEXT_PUBLIC_GAS_API` = your Apps Script `/exec` URL.
 
-## 2. Configure
-Copy `.env.example` to `.env.local` and set:
-DASHBOARD_USERNAME
-DASHBOARD_PASSWORD
-DASHBOARD_SESSION_SECRET
-DATA_SOURCE_URL
+## Data model
+For 12 Deeni:
+Month | Year | Chain | Region | State | Division | Distric | Pincode | Category | Activity | Report | Target52 | Target26
 
-For Google Sheets, use:
-https://docs.google.com/spreadsheets/d/YOUR_ID/export?format=csv
+For Department:
+Month | Year | Department | Frequency | Region | State | Division | Distric | Pincode | Activity/Work | Report | Target | Achievement
 
-You can also provide multiple comma-separated source URLs.
+## Important
+The sample geography/activity values are placeholders. Replace the master sheets with your complete India Region → State → Division → District → Pincode hierarchy. The web dashboard aggregates from district rows, so entering one row per district/activity/month is the recommended grain.
 
-For local CSV:
-DATA_SOURCE_URL=local
-
-Then replace `public/data/report.csv` with your real CSV.
-
-## 3. Run
-npm run dev
-
-## 4. Vercel
-Add the same environment variables in Project Settings → Environment Variables and redeploy. Vercel environment variables are configured per environment and changes require a new deployment to take effect.
-
-## Expected data columns
-Month, Year, Category, Deeni Activities, Fields, Multiple Field Name, Multiple Field Value, Chain, Department, Region, State, Division, District, Report Value, Target 26% (Value), Target 52% (Value)
-
-The parser also accepts common alternatives such as `Fileds`, `Deeni Kaam`, `Report`, `Value`, `Target 26%`, and `Target 52%`.
-
-## Login
-Default development credentials:
-Username: admin
-Password: change-me
-
-Change these before production.
-
-
-### Fields & Category Master
-The dashboard now includes the uploaded `Fileds With Category(1).xlsx` hierarchy as `public/data/fields-category.json`, used for Category → Deeni Activities → Fields filters.
+For production security, restrict the Apps Script deployment/access strategy and rotate the default admin password before use.
