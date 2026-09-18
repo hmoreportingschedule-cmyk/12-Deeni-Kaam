@@ -15,23 +15,39 @@ function q(m:string){const i=months.indexOf(m);return i<3?"Q1":i<6?"Q2":i<9?"Q3"
 export default function Home(){
  const [user,setUser]=useState<any>(null),[login,setLogin]=useState(true);
  const [email,setEmail]=useState(""),[password,setPassword]=useState("");
- const [rows,setRows]=useState<Row[]>([]),[tab,setTab]=useState("12");
+ const [rows,setRows]=useState<Row[]>([]),[compareRows,setCompareRows]=useState<Row[]>([]),[tab,setTab]=useState("12");
+ const [geo,setGeo]=useState<any[]>([]),[loadingText,setLoadingText]=useState("Loading dashboard…");
  const [target,setTarget]=useState<"52%"|"26%">("52%");
  const [month,setMonth]=useState("Jan"),[year,setYear]=useState(2026),[compareMonth,setCompareMonth]=useState("Feb"),[compareYear,setCompareYear]=useState(2026);
  const [level,setLevel]=useState("Country"),[region,setRegion]=useState("All"),[state,setState]=useState("All"),[division,setDivision]=useState("All"),[district,setDistrict]=useState("All");
  const [chain,setChain]=useState("12 Deeni Kaam"),[quarter,setQuarter]=useState("Q1"),[adminOpen,setAdminOpen]=useState(false),[users,setUsers]=useState<any[]>([]);
  const [busy,setBusy]=useState(false),[err,setErr]=useState("");
 
- useEffect(()=>{const u=localStorage.getItem("rpt_user");if(u){setUser(JSON.parse(u));setLogin(false);load(JSON.parse(u).token)}},[]);
+ useEffect(()=>{const u=localStorage.getItem("rpt_user");if(u){const parsed=JSON.parse(u);setUser(parsed);setLogin(false);init(parsed.token)}},[]);
+ useEffect(()=>{if(user&&!login) load(user.token)},[year,compareYear,region,state,division,district,tab]);
  async function api(action:string,payload:any={},token?:string){
     const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload,token:token||user?.token})});
    const j=await r.json().catch(()=>({ok:false,error:`Server returned HTTP ${r.status}`})); if(!j.ok) throw new Error(j.error||"API error"); return j;
  }
  async function doLogin(){
-   setBusy(true);setErr("");try{const j=await api("login",{email,password});localStorage.setItem("rpt_user",JSON.stringify(j.user));setUser(j.user);setLogin(false);await load(j.user.token)}catch(e:any){setErr(e.message)}finally{setBusy(false)}
+   setBusy(true);setErr("");try{const j=await api("login",{email,password});localStorage.setItem("rpt_user",JSON.stringify(j.user));setUser(j.user);setLogin(false);await init(j.user.token)}catch(e:any){setErr(e.message)}finally{setBusy(false)}
+ }
+ async function init(token?:string){
+   setBusy(true);setLoadingText("Loading master data…");setErr("");
+   try{
+     const m=await api("meta",{},token);setGeo(m.geo||[]);
+     await load(token);
+   }catch(e:any){setErr(e.message)}finally{setBusy(false)}
  }
  async function load(token?:string){
-   setBusy(true);try{const j=await api("rows",{sheet:tab==="12"?"Row Data (12 Deeni)":"Row Data (Department)"},token);setRows(j.rows||[])}catch(e:any){setErr(e.message)}finally{setBusy(false)}
+   setBusy(true);setLoadingText(`Loading ${year} data…`);setErr("");
+   try{
+     const payload={sheet:tab==="12"?"Row Data (12 Deeni)":"Row Data (Department)",year,region,state,division,district};
+     const j=await api("rows",payload,token);setRows(j.rows||[]);
+     if(Number(compareYear)!==Number(year)){
+       const c=await api("rows",{...payload,year:compareYear},token);setCompareRows(c.rows||[]);
+     } else setCompareRows(j.rows||[]);
+   }catch(e:any){setErr(e.message)}finally{setBusy(false)}
  }
  async function loadUsers(){try{const j=await api("users");setUsers(j.users||[])}catch(e:any){setErr(e.message)}}
  const filtered=useMemo(()=>rows.filter(r=>
@@ -43,16 +59,17 @@ export default function Home(){
  .filter(r=>district==="All"||r.Distric===district),[rows,chain,region,state,division,district,tab]);
 
  const selected=filtered.filter(r=>r.Month===month&&Number(r.Year)===Number(year));
- const comp=filtered.filter(r=>r.Month===compareMonth&&Number(r.Year)===Number(compareYear));
+ const compBase=Number(compareYear)===Number(year)?filtered:compareRows;
+ const comp=compBase.filter(r=>r.Month===compareMonth&&Number(r.Year)===Number(compareYear));
  const value=(r:Row)=>Number(target==="52%"?r.Target52:r.Target26)||0;
  const report=(a:Row[])=>a.reduce((s,r)=>s+(Number(r.Report)||0),0);
  const targ=(a:Row[])=>a.reduce((s,r)=>s+value(r),0);
  const ach=(a:Row[])=>targ(a)?report(a)/targ(a):0;
  const kpi={report:report(selected),target:targ(selected),achievement:ach(selected),comparison:ach(selected)-ach(comp)};
- const regions=rows.map(r=>r.Region).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
- const states=rows.filter(r=>region==="All"||r.Region===region).map(r=>r.State).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
- const divisions=rows.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)).map(r=>r.Division).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
- const districts=rows.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)&&(division==="All"||r.Division===division)).map(r=>r.Distric).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const regions=geo.map(r=>r.Region).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const states=geo.filter(r=>region==="All"||r.Region===region).map(r=>r.State).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const divisions=geo.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)).map(r=>r.Division).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const districts=geo.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)&&(division==="All"||r.Division===division)).map(r=>r.Distric).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
  const activities=filtered.map(r=>r.Activity).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);
  const activityData=activities.map(a=>{const rr=selected.filter(r=>r.Activity===a);return {name:a,achievement:ach(rr)*100,report:report(rr)}}).sort((a,b)=>b.achievement-a.achievement);
  const rank=(field:keyof Row,limit:number)=>{const m=new Map<string,Row[]>();selected.forEach(r=>{const k=String(r[field]||"");if(k)m.set(k,[...(m.get(k)||[]),r])});return [...m.entries()].map(([name,rr])=>({name,achievement:ach(rr)})).sort((a,b)=>b.achievement-a.achievement).slice(0,limit)};
@@ -62,7 +79,7 @@ export default function Home(){
  if(login) return <main className="login"><div className="card login-card"><h1>Reporting & Analise</h1><p>12 Deeni & Department Dashboard</p><input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)}/><input placeholder="Password" type="password" value={password} onChange={e=>setPassword(e.target.value)}/><button onClick={doLogin} disabled={busy}>{busy?"Signing in…":"Login"}</button>{err&&<div className="error">{err}</div>}<small>Admin/user accounts are managed in Google Sheets.</small></div></main>;
 
  return <main><header><div><h1>Reporting & Analise Dashboard</h1><span>{user?.name} · {user?.role}</span></div><div className="actions"><button onClick={()=>load()}>↻ Refresh</button>{user?.role==="admin"&&<button onClick={()=>{setAdminOpen(!adminOpen);if(!adminOpen)loadUsers()}}>Admin</button>}<button onClick={()=>{localStorage.removeItem("rpt_user");location.reload()}}>Logout</button></div></header>
- <nav><button className={tab==="12"?"active":""} onClick={()=>{setTab("12");setChain("12 Deeni Kaam");setTimeout(()=>load(),0)}}>12 Deeni Kaam Report</button><button className={tab==="dep"?"active":""} onClick={()=>{setTab("dep");setChain("Department");setTimeout(()=>load(),0)}}>Department Report</button></nav>
+ <nav><button className={tab==="12"?"active":""} onClick={()=>{setTab("12");setChain("12 Deeni Kaam")}}>12 Deeni Kaam Report</button><button className={tab==="dep"?"active":""} onClick={()=>{setTab("dep");setChain("Department")}}>Department Report</button></nav>
  {adminOpen&&user?.role==="admin"&&<Admin users={users} onDone={loadUsers}/>}
  <section className="filters card">
    <label>Chain<select value={chain} onChange={e=>setChain(e.target.value)}><option>12 Deeni Kaam</option><option>Department</option><option>Central</option></select></label>
@@ -78,7 +95,7 @@ export default function Home(){
    <label>Compare Month<select value={compareMonth} onChange={e=>setCompareMonth(e.target.value)}>{months.map(x=><option key={x}>{x}</option>)}</select></label>
    <label>Compare Year<select value={compareYear} onChange={e=>setCompareYear(Number(e.target.value))}>{years.map(x=><option key={x}>{x}</option>)}</select></label>
  </section>
- {err&&<div className="error global">{err}</div>}
+ {busy&&<div className="loading global">{loadingText}</div>}{err&&<div className="error global">{err}</div>}
  <section className="kpis"><Kpi title="Report" value={kpi.report.toLocaleString()}/><Kpi title={`Target ${target}`} value={kpi.target.toLocaleString()}/><Kpi title="Achievement" value={pct(kpi.achievement)}/><Kpi title="Month Comparison" value={(kpi.comparison>=0?"+":"")+pct(kpi.comparison)} cls={kpi.comparison>=0?"plus":"minus"}/></section>
  <section className="grid2"><div className="card chart"><h2>Activity Achievement</h2><ResponsiveContainer width="100%" height={320}><BarChart data={activityData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name"/><YAxis/><Tooltip/><Legend/><Bar dataKey="achievement" name="Achievement %"/></BarChart></ResponsiveContainer></div><div className="card chart"><h2>Month Trend — {year}</h2><ResponsiveContainer width="100%" height={320}><LineChart data={monthly}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="month"/><YAxis/><Tooltip/><Line type="monotone" dataKey="achievement" name="Achievement %"/></LineChart></ResponsiveContainer></div></section>
  <section className="grid2"><Rank title="Top 3 Regions" data={rank("Region",3)}/><Rank title="Top 5 States" data={rank("State",5)}/><Rank title="Top 20 Divisions" data={rank("Division",20)}/><Rank title="Top 15 Districts" data={rank("Distric",15)}/></section>
