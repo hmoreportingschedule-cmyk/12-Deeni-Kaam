@@ -52,3 +52,6 @@ The server proxy is the permanent fix for the browser-side `Failed to fetch` err
 - 12 Deeni columns: Month, Year, Chain, Region, State, Division, Distric, Pincode, Category, Deeni Activities, Report, Target 52%, Target 26%.
 - Department columns: Month, Year, Department, Frequency, Region, State, Division, Distric, Pincode, Activity/Work, Report, Target, Achievement.
 - In Excel mode, year/filter changes are processed locally and do not reload the whole Google Sheet dataset.
+
+## Fast URL Sync
+The dashboard includes `Sync URL` for a public Google Drive Excel URL, Google Sheets URL, or direct `.xlsx/.xls/.csv` URL. The server converts common Google Drive/Sheets links, downloads and parses the workbook server-side, and uses Next.js fetch revalidation for 60-second source caching. After sync, dashboard filters/charts use the loaded rows locally instead of re-fetching Google Sheets on every filter change.

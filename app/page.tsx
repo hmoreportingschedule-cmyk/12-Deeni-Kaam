@@ -32,6 +32,8 @@ export default function Home(){
  const [busy,setBusy]=useState(false),[err,setErr]=useState("");
  const [dataSource,setDataSource]=useState<"google"|"excel">("google");
  const [uploadedFile,setUploadedFile]=useState<File|null>(null);
+ const [syncUrl,setSyncUrl]=useState("");
+ const [syncSourceName,setSyncSourceName]=useState("");
  const fileRef=useRef<HTMLInputElement>(null);
 
  useEffect(()=>{const u=localStorage.getItem("rpt_user");if(u){const parsed=JSON.parse(u);setUser(parsed);setLogin(false);init(parsed.token)}},[]);
@@ -82,6 +84,24 @@ export default function Home(){
      if(firstMonth)setMonth(firstMonth);
    }catch(e:any){setErr(e.message||"Excel upload failed.")}finally{setBusy(false)}
  }
+ async function syncFromUrl(){
+   const url=syncUrl.trim();
+   if(!url){setErr("Google Drive/Excel URL paste karein.");return;}
+   setBusy(true);setLoadingText("Syncing data from URL…");setErr("");
+   try{
+     const r=await fetch("/api/sync-url",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url,mode:tab})});
+     const j=await r.json().catch(()=>({ok:false,error:`Server returned HTTP ${r.status}`}));
+     if(!r.ok||!j.ok) throw new Error(j.error||"URL sync failed.");
+     const parsed=normalizeRows(j.rows||[],tab==="dep");
+     if(!parsed.length) throw new Error("URL file mein valid Row Data nahi mila.");
+     setRows(parsed);setCompareRows(parsed);setGeo((j.geo||parsed.map((r:Row)=>({Region:r.Region,State:r.State,Division:r.Division,Distric:r.Distric,Pincode:r.Pincode}))));
+     setDataSource("excel");setUploadedFile(null);setSyncSourceName(j.fileName||url);
+     setRegion("All");setState("All");setDivision("All");setDistrict("All");
+     const firstYear=parsed.find(r=>r.Year)?.Year; const firstMonth=parsed.find(r=>r.Month)?.Month;
+     if(firstYear)setYear(firstYear); if(firstMonth)setMonth(firstMonth);
+   }catch(e:any){setErr(e.message||"URL sync failed.")}finally{setBusy(false)}
+ }
+
  const filtered=useMemo(()=>rows.filter(r=>
    (r.Chain||"")===chain || tab==="dep"
  ).filter(r=>
@@ -127,7 +147,7 @@ export default function Home(){
    <label>Compare Month<select value={compareMonth} onChange={e=>setCompareMonth(e.target.value)}>{months.map(x=><option key={x}>{x}</option>)}</select></label>
    <label>Compare Year<select value={compareYear} onChange={e=>setCompareYear(Number(e.target.value))}>{years.map(x=><option key={x}>{x}</option>)}</select></label>
  </section>
- {busy&&<div className="loading global">{loadingText}</div>}{dataSource==="excel"&&<div className="source global">Excel Data Loaded — Dashboard is using the uploaded file.</div>}{err&&<div className="error global">{err}</div>}
+ {busy&&<div className="loading global">{loadingText}</div>}{dataSource==="excel"&&<div className="source global">Excel/URL Data Loaded — Dashboard is using the synced data.</div>}{err&&<div className="error global">{err}</div>}
  <section className="kpis"><Kpi title="Report" value={kpi.report.toLocaleString()}/><Kpi title={`Target ${target}`} value={kpi.target.toLocaleString()}/><Kpi title="Achievement" value={pct(kpi.achievement)}/><Kpi title="Month Comparison" value={(kpi.comparison>=0?"+":"")+pct(kpi.comparison)} cls={kpi.comparison>=0?"plus":"minus"}/></section>
  <section className="grid2"><div className="card chart"><h2>Activity Achievement</h2><ResponsiveContainer width="100%" height={320}><BarChart data={activityData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name"/><YAxis/><Tooltip/><Legend/><Bar dataKey="achievement" name="Achievement %"/></BarChart></ResponsiveContainer></div><div className="card chart"><h2>Month Trend — {year}</h2><ResponsiveContainer width="100%" height={320}><LineChart data={monthly}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="month"/><YAxis/><Tooltip/><Line type="monotone" dataKey="achievement" name="Achievement %"/></LineChart></ResponsiveContainer></div></section>
  <section className="grid2"><Rank title="Top 3 Regions" data={rank("Region",3)}/><Rank title="Top 5 States" data={rank("State",5)}/><Rank title="Top 20 Divisions" data={rank("Division",20)}/><Rank title="Top 15 Districts" data={rank("Distric",15)}/></section>
