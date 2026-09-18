@@ -50,11 +50,11 @@ export default function Home(){
  const targ=(a:Row[])=>a.reduce((s,r)=>s+value(r),0);
  const ach=(a:Row[])=>targ(a)?report(a)/targ(a):0;
  const kpi={report:report(selected),target:targ(selected),achievement:ach(selected),comparison:ach(selected)-ach(comp)};
- const regions=Array.from(new Set(rows.map(r=>r.Region).filter(Boolean))).sort();
- const states=Array.from(new Set(rows.filter(r=>region==="All"||r.Region===region).map(r=>r.State).filter(Boolean))).sort();
- const divisions=Array.from(new Set(rows.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)).map(r=>r.Division).filter(Boolean))).sort();
- const districts=Array.from(new Set(rows.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)&&(division==="All"||r.Division===division)).map(r=>r.Distric).filter(Boolean))).sort();
- const activities=Array.from(new Set(filtered.map(r=>r.Activity).filter(Boolean)));
+ const regions=rows.map(r=>r.Region).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const states=rows.filter(r=>region==="All"||r.Region===region).map(r=>r.State).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const divisions=rows.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)).map(r=>r.Division).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const districts=rows.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)&&(division==="All"||r.Division===division)).map(r=>r.Distric).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const activities=filtered.map(r=>r.Activity).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);
  const activityData=activities.map(a=>{const rr=selected.filter(r=>r.Activity===a);return {name:a,achievement:ach(rr)*100,report:report(rr)}}).sort((a,b)=>b.achievement-a.achievement);
  const rank=(field:keyof Row,limit:number)=>{const m=new Map<string,Row[]>();selected.forEach(r=>{const k=String(r[field]||"");if(k)m.set(k,[...(m.get(k)||[]),r])});return [...m.entries()].map(([name,rr])=>({name,achievement:ach(rr)})).sort((a,b)=>b.achievement-a.achievement).slice(0,limit)};
  const monthly=months.map(m=>{const rr=filtered.filter(r=>r.Month===m&&Number(r.Year)===Number(year));return {month:m,achievement:ach(rr)*100}});
