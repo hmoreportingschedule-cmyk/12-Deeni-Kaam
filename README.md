@@ -27,8 +27,8 @@
 5. Deploy → New deployment → Web app.
 6. Execute as: Me. Who has access: Anyone.
 7. Copy the `/exec` URL.
-8. Create `.env.local` from `.env.example` and set:
-   NEXT_PUBLIC_GAS_API=YOUR_EXEC_URL
+8. The supplied `app/page.tsx` already contains the provided Google Apps Script `/exec` URL, so no Vercel Environment Variable is required for this version.
+9. If you later change the Google Apps Script deployment URL, replace the `API` constant in `app/page.tsx` in both locations.
 
 The script creates:
 - `Users`
@@ -46,6 +46,8 @@ After setup, `setupSheets()` creates an admin account:
 Change this password immediately by creating/updating the admin user from the app.
 
 ## Vercel
+No `NEXT_PUBLIC_GAS_API` environment variable is required in this fixed build.
+
 ```bash
 npm install
 npm run build
