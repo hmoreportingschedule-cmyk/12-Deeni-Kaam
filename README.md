@@ -1,5 +1,8 @@
 # Reporting & Analise Dashboard — Vercel + Google Sheets
 
+## Build fix included
+- The TypeScript `Set` iteration build error is permanently addressed by using `Array.from(new Set(...))` and an explicit `tsconfig.json` with ES2017 + `downlevelIteration`. Vercel will therefore not depend on an auto-generated ES5 TypeScript target.
+
 ## What is included
 - Excel formula-ready template: `Reporting_Analise_Dashboard_Template.xlsx`
 - Next.js dashboard for Vercel
