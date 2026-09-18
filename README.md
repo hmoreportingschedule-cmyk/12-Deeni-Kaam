@@ -47,6 +47,8 @@ The server proxy is the permanent fix for the browser-side `Failed to fetch` err
 
 
 ## Excel Upload
-The dashboard now has **Upload Excel** and **Excel Format** buttons. Download the template, fill `Row Data (12 Deeni)` or `Row Data (Department)`, then upload it. The dashboard reads the selected sheet locally in the browser, so it does not need to wait for Google Sheets for uploaded data. Supported files: `.xlsx`, `.xls`, `.csv`.
-
-For the 12 Deeni sheet use these columns: Month, Year, Chain, Region, State, Division, Distric, Pincode, Category, Deeni Activities, Report, Target 52%, Target 26%.
+- Upload Excel reads `.xlsx`, `.xls`, and `.csv` in the browser for fast dashboard interaction.
+- Excel Format downloads `public/Row_Data_12_Deeni_Format.xlsx`.
+- 12 Deeni columns: Month, Year, Chain, Region, State, Division, Distric, Pincode, Category, Deeni Activities, Report, Target 52%, Target 26%.
+- Department columns: Month, Year, Department, Frequency, Region, State, Division, Distric, Pincode, Activity/Work, Report, Target, Achievement.
+- In Excel mode, year/filter changes are processed locally and do not reload the whole Google Sheet dataset.

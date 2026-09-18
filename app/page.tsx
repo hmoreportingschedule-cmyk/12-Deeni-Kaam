@@ -1,7 +1,7 @@
 "use client";
-import React,{useEffect,useMemo,useState} from "react";
-import {BarChart,Bar,LineChart,Line,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer} from "recharts";
+import React,{useEffect,useMemo,useRef,useState} from "react";
 import * as XLSX from "xlsx";
+import {BarChart,Bar,LineChart,Line,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer} from "recharts";
 
 type Row={Month:string;Year:number;Chain:string;Region:string;State:string;Division:string;Distric:string;Pincode:string;Category:string;Activity:string;Report:number;Target52:number;Target26:number;};
 const API="/api/gas";
@@ -12,52 +12,76 @@ const quarters=["Q1","Q2","Q3","Q4"];
 function pct(n:number){return `${(n*100).toFixed(1)}%`}
 function period(r:Row){return `${r.Month}-${r.Year}`}
 function q(m:string){const i=months.indexOf(m);return i<3?"Q1":i<6?"Q2":i<9?"Q3":"Q4"}
+function norm(v:any){return String(v??"").trim()}
+function num(v:any){const n=Number(String(v??"").replace(/,/g,""));return Number.isFinite(n)?n:0}
+function normalizeRows(raw:any[],department:boolean):Row[]{
+ const aliases:any={Month:["Month","Month Name"],Year:["Year"],Chain:["Chain"],Region:["Region"],State:["State"],Division:["Division"],Distric:["Distric","District"],Pincode:["Pincode","Pin Code","PIN Code"],Category:["Category"],Activity:department?["Activity/Work","Activity","Deeni Activities"]:["Deeni Activities","Activity","Activity/Work"],Report:["Report"],Target52:["Target 52%","Target52","Target 52"],Target26:["Target 26%","Target26","Target 26"],Target:["Target"]};
+ const key=(o:any,ks:string[])=>{for(const k of ks)if(o[k]!==undefined)return o[k];return ""};
+ return raw.map(o=>{const r:any={};Object.keys(aliases).forEach(k=>r[k]=key(o,aliases[k]));return {Month:norm(r.Month),Year:num(r.Year),Chain:norm(r.Chain)||(department?"Department":"12 Deeni Kaam"),Region:norm(r.Region),State:norm(r.State),Division:norm(r.Division),Distric:norm(r.Distric),Pincode:norm(r.Pincode),Category:norm(r.Category),Activity:norm(r.Activity),Report:num(r.Report),Target52:num(r.Target52)||(department?num(r.Target):0),Target26:num(r.Target26)||(department?num(r.Target):0)} as Row;}).filter(r=>r.Month||r.Year||r.Activity||r.Report||r.Region);
+}
 
 export default function Home(){
  const [user,setUser]=useState<any>(null),[login,setLogin]=useState(true);
  const [email,setEmail]=useState(""),[password,setPassword]=useState("");
- const [rows,setRows]=useState<Row[]>([]),[tab,setTab]=useState("12"),[dataSource,setDataSource]=useState<"google"|"excel">("google"),[uploadName,setUploadName]=useState("");
+ const [rows,setRows]=useState<Row[]>([]),[compareRows,setCompareRows]=useState<Row[]>([]),[tab,setTab]=useState("12");
+ const [geo,setGeo]=useState<any[]>([]),[loadingText,setLoadingText]=useState("Loading dashboard…");
  const [target,setTarget]=useState<"52%"|"26%">("52%");
  const [month,setMonth]=useState("Jan"),[year,setYear]=useState(2026),[compareMonth,setCompareMonth]=useState("Feb"),[compareYear,setCompareYear]=useState(2026);
  const [level,setLevel]=useState("Country"),[region,setRegion]=useState("All"),[state,setState]=useState("All"),[division,setDivision]=useState("All"),[district,setDistrict]=useState("All");
  const [chain,setChain]=useState("12 Deeni Kaam"),[quarter,setQuarter]=useState("Q1"),[adminOpen,setAdminOpen]=useState(false),[users,setUsers]=useState<any[]>([]);
  const [busy,setBusy]=useState(false),[err,setErr]=useState("");
+ const [dataSource,setDataSource]=useState<"google"|"excel">("google");
+ const [uploadedFile,setUploadedFile]=useState<File|null>(null);
+ const fileRef=useRef<HTMLInputElement>(null);
 
- useEffect(()=>{const u=localStorage.getItem("rpt_user");if(u){setUser(JSON.parse(u));setLogin(false);load(JSON.parse(u).token)}},[]);
+ useEffect(()=>{const u=localStorage.getItem("rpt_user");if(u){const parsed=JSON.parse(u);setUser(parsed);setLogin(false);init(parsed.token)}},[]);
+ useEffect(()=>{if(user&&!login&&dataSource==="google") load(user.token)},[year,compareYear,region,state,division,district,tab,dataSource]);
  async function api(action:string,payload:any={},token?:string){
     const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload,token:token||user?.token})});
    const j=await r.json().catch(()=>({ok:false,error:`Server returned HTTP ${r.status}`})); if(!j.ok) throw new Error(j.error||"API error"); return j;
  }
  async function doLogin(){
-   setBusy(true);setErr("");try{const j=await api("login",{email,password});localStorage.setItem("rpt_user",JSON.stringify(j.user));setUser(j.user);setLogin(false);await load(j.user.token)}catch(e:any){setErr(e.message)}finally{setBusy(false)}
+   setBusy(true);setErr("");try{const j=await api("login",{email,password});localStorage.setItem("rpt_user",JSON.stringify(j.user));setUser(j.user);setLogin(false);await init(j.user.token)}catch(e:any){setErr(e.message)}finally{setBusy(false)}
+ }
+ async function init(token?:string){
+   setBusy(true);setLoadingText("Loading master data…");setErr("");
+   try{
+     const m=await api("meta",{},token);setGeo(m.geo||[]);
+     await load(token);
+   }catch(e:any){setErr(e.message)}finally{setBusy(false)}
  }
  async function load(token?:string){
-   setBusy(true);setErr("");try{const j=await api("rows",{sheet:tab==="12"?"Row Data (12 Deeni)":"Row Data (Department)"},token);setRows(normalizeRows(j.rows||[]));setDataSource("google")}catch(e:any){setErr(e.message)}finally{setBusy(false)}
- }
- function normalizeRows(input:any[]):Row[]{
-   return input.map((r:any)=>({
-     Month:String(r.Month??r["Month Name"]??""), Year:Number(r.Year??0), Chain:String(r.Chain??""),
-     Region:String(r.Region??""), State:String(r.State??""), Division:String(r.Division??""), Distric:String(r.Distric??r.District??""),
-     Pincode:String(r.Pincode??""), Category:String(r.Category??""), Activity:String(r.Activity??r["Deeni Activities"]??r["Activity / Work"]??""),
-     Report:Number(r.Report??0)||0, Target52:Number(r.Target52??r["Target 52%"]??r["Target52"]??0)||0, Target26:Number(r.Target26??r["Target 26%"]??r["Target26"]??0)||0
-   }));
- }
- async function uploadExcel(file:File){
-   setBusy(true);setErr("");
+   setBusy(true);setLoadingText(`Loading ${year} data…`);setErr("");
    try{
-     const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:"array"});
-     const wanted=tab==="12"?"Row Data (12 Deeni)":"Row Data (Department)";
-     const sheetName=wb.SheetNames.includes(wanted)?wanted:wb.SheetNames[0];
-     const ws=XLSX.utils.worksheet_to_json(wb.Sheets[sheetName],{defval:""});
-     const normalized=normalizeRows(ws);
-     if(!normalized.length) throw new Error("Excel file mein koi data row nahi mili.");
-     setRows(normalized);setDataSource("excel");setUploadName(file.name);
-     localStorage.setItem("rpt_excel_name",file.name);
-   }catch(e:any){setErr(e.message||"Excel upload failed")}finally{setBusy(false)}
+     const payload={sheet:tab==="12"?"Row Data (12 Deeni)":"Row Data (Department)",year,region,state,division,district};
+     const j=await api("rows",payload,token);setRows(j.rows||[]);
+     if(Number(compareYear)!==Number(year)){
+       const c=await api("rows",{...payload,year:compareYear},token);setCompareRows(c.rows||[]);
+     } else setCompareRows(j.rows||[]);
+   }catch(e:any){setErr(e.message)}finally{setBusy(false)}
  }
- function handleFile(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(f) uploadExcel(f);e.currentTarget.value=""}
- function clearExcel(){setUploadName("");setDataSource("google");load()}
  async function loadUsers(){try{const j=await api("users");setUsers(j.users||[])}catch(e:any){setErr(e.message)}}
+ async function uploadExcel(file:File, mode=tab){
+   setBusy(true);setLoadingText("Reading Excel file…");setErr("");
+   try{
+     const buffer=await file.arrayBuffer();
+     const wb=XLSX.read(buffer,{type:"array",cellDates:false});
+     const wanted=mode==="12"?"Row Data (12 Deeni)":"Row Data (Department)";
+     const sheetName=wb.SheetNames.includes(wanted)?wanted:wb.SheetNames[0];
+     if(!sheetName) throw new Error("Excel file has no worksheet.");
+     const raw=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{defval:""});
+     const parsed=normalizeRows(raw,mode==="dep");
+     if(!parsed.length) throw new Error("No valid Row Data found. Please use the Excel Format button.");
+     setRows(parsed);setCompareRows(parsed);setDataSource("excel");setUploadedFile(file);
+     const g=parsed.map(r=>({Region:r.Region,State:r.State,Division:r.Division,Distric:r.Distric,Pincode:r.Pincode}));
+     setGeo(g);
+     setRegion("All");setState("All");setDivision("All");setDistrict("All");
+     const firstYear=parsed.find(r=>r.Year)?.Year;
+     const firstMonth=parsed.find(r=>r.Month)?.Month;
+     if(firstYear)setYear(firstYear);
+     if(firstMonth)setMonth(firstMonth);
+   }catch(e:any){setErr(e.message||"Excel upload failed.")}finally{setBusy(false)}
+ }
  const filtered=useMemo(()=>rows.filter(r=>
    (r.Chain||"")===chain || tab==="dep"
  ).filter(r=>
@@ -67,16 +91,17 @@ export default function Home(){
  .filter(r=>district==="All"||r.Distric===district),[rows,chain,region,state,division,district,tab]);
 
  const selected=filtered.filter(r=>r.Month===month&&Number(r.Year)===Number(year));
- const comp=filtered.filter(r=>r.Month===compareMonth&&Number(r.Year)===Number(compareYear));
+ const compBase=Number(compareYear)===Number(year)?filtered:compareRows;
+ const comp=compBase.filter(r=>r.Month===compareMonth&&Number(r.Year)===Number(compareYear));
  const value=(r:Row)=>Number(target==="52%"?r.Target52:r.Target26)||0;
  const report=(a:Row[])=>a.reduce((s,r)=>s+(Number(r.Report)||0),0);
  const targ=(a:Row[])=>a.reduce((s,r)=>s+value(r),0);
  const ach=(a:Row[])=>targ(a)?report(a)/targ(a):0;
  const kpi={report:report(selected),target:targ(selected),achievement:ach(selected),comparison:ach(selected)-ach(comp)};
- const regions=rows.map(r=>r.Region).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
- const states=rows.filter(r=>region==="All"||r.Region===region).map(r=>r.State).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
- const divisions=rows.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)).map(r=>r.Division).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
- const districts=rows.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)&&(division==="All"||r.Division===division)).map(r=>r.Distric).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const regions=geo.map(r=>r.Region).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const states=geo.filter(r=>region==="All"||r.Region===region).map(r=>r.State).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const divisions=geo.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)).map(r=>r.Division).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
+ const districts=geo.filter(r=>(region==="All"||r.Region===region)&&(state==="All"||r.State===state)&&(division==="All"||r.Division===division)).map(r=>r.Distric).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).sort();
  const activities=filtered.map(r=>r.Activity).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);
  const activityData=activities.map(a=>{const rr=selected.filter(r=>r.Activity===a);return {name:a,achievement:ach(rr)*100,report:report(rr)}}).sort((a,b)=>b.achievement-a.achievement);
  const rank=(field:keyof Row,limit:number)=>{const m=new Map<string,Row[]>();selected.forEach(r=>{const k=String(r[field]||"");if(k)m.set(k,[...(m.get(k)||[]),r])});return [...m.entries()].map(([name,rr])=>({name,achievement:ach(rr)})).sort((a,b)=>b.achievement-a.achievement).slice(0,limit)};
@@ -85,9 +110,8 @@ export default function Home(){
 
  if(login) return <main className="login"><div className="card login-card"><h1>Reporting & Analise</h1><p>12 Deeni & Department Dashboard</p><input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)}/><input placeholder="Password" type="password" value={password} onChange={e=>setPassword(e.target.value)}/><button onClick={doLogin} disabled={busy}>{busy?"Signing in…":"Login"}</button>{err&&<div className="error">{err}</div>}<small>Admin/user accounts are managed in Google Sheets.</small></div></main>;
 
- return <main><header><div><h1>Reporting & Analise Dashboard</h1><span>{user?.name} · {user?.role}</span></div><div className="actions"><label className="uploadBtn">📊 Upload Excel<input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} hidden/></label><a className="templateBtn" href="/Reporting_Analise_Dashboard_Template.xlsx" download>⬇ Excel Format</a>{dataSource==="excel"&&<button onClick={clearExcel}>Use Google Data</button>}<button onClick={()=>load()}>↻ Refresh</button>{user?.role==="admin"&&<button onClick={()=>{setAdminOpen(!adminOpen);if(!adminOpen)loadUsers()}}>Admin</button>}<button onClick={()=>{localStorage.removeItem("rpt_user");location.reload()}}>Logout</button></div></header>
- <nav><button className={tab==="12"?"active":""} onClick={()=>{setTab("12");setChain("12 Deeni Kaam");if(dataSource==="google")setTimeout(()=>load(),0)}}>12 Deeni Kaam Report</button><button className={tab==="dep"?"active":""} onClick={()=>{setTab("dep");setChain("Department");if(dataSource==="google")setTimeout(()=>load(),0)}}>Department Report</button></nav>
- <div className="dataStatus">Data Source: <b>{dataSource==="excel"?`Excel — ${uploadName}`:"Google Sheets"}</b> {busy&&<span> · Loading…</span>}</div>
+ return <main><header><div><h1>Reporting & Analise Dashboard</h1><span>{user?.name} · {user?.role}</span></div><div className="actions"><button onClick={()=>dataSource==="excel"&&uploadedFile?uploadExcel(uploadedFile,tab):load()}>↻ Refresh</button><button onClick={()=>fileRef.current?.click()}>📊 Upload Excel</button><a className="download-btn" href="/Row_Data_12_Deeni_Format.xlsx" download>⬇ Excel Format</a><input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)uploadExcel(f);e.currentTarget.value=""}}/>{user?.role==="admin"&&<button onClick={()=>{setAdminOpen(!adminOpen);if(!adminOpen)loadUsers()}}>Admin</button>}<button onClick={()=>{localStorage.removeItem("rpt_user");location.reload()}}>Logout</button></div></header>
+ <nav><button className={tab==="12"?"active":""} onClick={()=>{setTab("12");setChain("12 Deeni Kaam");if(dataSource==="excel"&&uploadedFile)uploadExcel(uploadedFile,"12")}}>12 Deeni Kaam Report</button><button className={tab==="dep"?"active":""} onClick={()=>{setTab("dep");setChain("Department");if(dataSource==="excel"&&uploadedFile)uploadExcel(uploadedFile,"dep")}}>Department Report</button></nav>
  {adminOpen&&user?.role==="admin"&&<Admin users={users} onDone={loadUsers}/>}
  <section className="filters card">
    <label>Chain<select value={chain} onChange={e=>setChain(e.target.value)}><option>12 Deeni Kaam</option><option>Department</option><option>Central</option></select></label>
@@ -103,7 +127,7 @@ export default function Home(){
    <label>Compare Month<select value={compareMonth} onChange={e=>setCompareMonth(e.target.value)}>{months.map(x=><option key={x}>{x}</option>)}</select></label>
    <label>Compare Year<select value={compareYear} onChange={e=>setCompareYear(Number(e.target.value))}>{years.map(x=><option key={x}>{x}</option>)}</select></label>
  </section>
- {err&&<div className="error global">{err}</div>}
+ {busy&&<div className="loading global">{loadingText}</div>}{dataSource==="excel"&&<div className="source global">Excel Data Loaded — Dashboard is using the uploaded file.</div>}{err&&<div className="error global">{err}</div>}
  <section className="kpis"><Kpi title="Report" value={kpi.report.toLocaleString()}/><Kpi title={`Target ${target}`} value={kpi.target.toLocaleString()}/><Kpi title="Achievement" value={pct(kpi.achievement)}/><Kpi title="Month Comparison" value={(kpi.comparison>=0?"+":"")+pct(kpi.comparison)} cls={kpi.comparison>=0?"plus":"minus"}/></section>
  <section className="grid2"><div className="card chart"><h2>Activity Achievement</h2><ResponsiveContainer width="100%" height={320}><BarChart data={activityData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name"/><YAxis/><Tooltip/><Legend/><Bar dataKey="achievement" name="Achievement %"/></BarChart></ResponsiveContainer></div><div className="card chart"><h2>Month Trend — {year}</h2><ResponsiveContainer width="100%" height={320}><LineChart data={monthly}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="month"/><YAxis/><Tooltip/><Line type="monotone" dataKey="achievement" name="Achievement %"/></LineChart></ResponsiveContainer></div></section>
  <section className="grid2"><Rank title="Top 3 Regions" data={rank("Region",3)}/><Rank title="Top 5 States" data={rank("State",5)}/><Rank title="Top 20 Divisions" data={rank("Division",20)}/><Rank title="Top 15 Districts" data={rank("Distric",15)}/></section>
