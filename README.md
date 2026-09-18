@@ -44,3 +44,9 @@ Do not deploy only an old commit. Confirm the new commit contains:
 - `tsconfig.json`
 
 The server proxy is the permanent fix for the browser-side `Failed to fetch` error caused by direct Apps Script requests.
+
+
+## Excel Upload
+The dashboard now has **Upload Excel** and **Excel Format** buttons. Download the template, fill `Row Data (12 Deeni)` or `Row Data (Department)`, then upload it. The dashboard reads the selected sheet locally in the browser, so it does not need to wait for Google Sheets for uploaded data. Supported files: `.xlsx`, `.xls`, `.csv`.
+
+For the 12 Deeni sheet use these columns: Month, Year, Chain, Region, State, Division, Distric, Pincode, Category, Deeni Activities, Report, Target 52%, Target 26%.
